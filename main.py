@@ -49,6 +49,132 @@ DEFAULT_STYLES = {
     },
 }
 
+SITEMAP_TEMPLATE_V2 = r"""//SimpleSitemap (Experience Template model)
+SalesforceInteractions.setLoggingLevel(100);
+SalesforceInteractions.updateConsents({
+    purpose: SalesforceInteractions.ConsentPurpose.Tracking,
+    provider: "Example Consent Manager",
+    status: SalesforceInteractions.ConsentStatus.OptIn
+});
+
+document.addEventListener(
+    SalesforceInteractions.CustomEvents.OnSetAnonymousId, () => {
+        SalesforceInteractions.sendEvent({
+            user: { attributes: { eventType: 'identity', isAnonymous: 1 } }
+        })
+    }
+);
+
+document.querySelector('html').style.fontSize = '14px';
+
+SalesforceInteractions.init().then(() => {
+    const config = {
+        global: { onActionEvent: (event) => { return event; } },
+        pageTypes: [{
+            name: "Homepage",
+            isMatch: () => window.location.pathname === '/',
+            interaction: { name: "Homepage", eventType: "browse", pageType: "Homepage" },
+            contentZones: [
+                { name: "Homepage | Hero", selector: "{{HERO_SELECTOR}}" },
+                { name: "Homepage | Cards", selector: "{{CARD_SELECTOR}}" }
+            ]
+        }],
+        pageTypeDefault: { name: "Default" }
+    };
+    SalesforceInteractions.initSitemap(config);
+});"""
+
+
+CARD_EXPERIENCE_TEMPLATE_HTML = r"""<style>
+    .sfdcep-recs-carousel {
+        width: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-evenly;
+        padding: 20px 0;
+        gap: 20px;
+    }
+    .sfdcep-recs-card-wrapper {
+        width: 22%;
+        min-width: 240px;
+        flex: 1 1 240px;
+    }
+    .sfdcep-recs-card {
+        height: 100%;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+        display: flex;
+        flex-direction: column;
+    }
+    .sfdcep-recs-card .cmp-image__image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        display: block;
+    }
+    .sfdcep-recs-card__content {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        flex: 1;
+    }
+    .sfdcep-recs-card__title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1d1d1d;
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    .sfdcep-recs-card__cta {
+        color: #097fb3;
+        font-size: 14px;
+        text-decoration: none;
+        font-weight: 500;
+        font-family: Arial, Helvetica, sans-serif;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: auto;
+    }
+    .sfdcep-recs-card__cta:hover {
+        text-decoration: underline;
+    }
+</style>
+<div class="sfdcep-recs-carousel">
+    {{#each (subVar 'recs')}}
+    <div class="sfdcep-recs-card-wrapper">
+        <div class="sfdcep-recs-card">
+            <div class="cmp-teaser__image">
+                {{#if (subVar 'image')}}
+                    <img src="{{subVar 'image'}}" class="cmp-image__image" alt="{{subVar 'name'}}">
+                {{else}}
+                    <img src="https://placehold.co/750x422/e8f4fb/097fb3?text=No+Image" class="cmp-image__image" alt="">
+                {{/if}}
+            </div>
+            <div class="sfdcep-recs-card__content">
+                <h3 class="sfdcep-recs-card__title">{{subVar 'name'}}</h3>
+                <a class="sfdcep-recs-card__cta" href="{{subVar 'linkUrl'}}" target="_self">Learn More</a>
+            </div>
+        </div>
+    </div>
+    {{/each}}
+</div>"""
+
+
+def assemble_sitemap_v2(hero_selector, card_selector):
+    """Build the minimal Experience Template-style sitemap JS with hero + card content zones."""
+    return (
+        SITEMAP_TEMPLATE_V2
+        .replace("{{HERO_SELECTOR}}", hero_selector)
+        .replace("{{CARD_SELECTOR}}", card_selector or "BODY_CARDS_SELECTOR")
+    )
+
+
 SITEMAP_TEMPLATE = r"""//SimpleSitemap
 SalesforceInteractions.setLoggingLevel(100);
 SalesforceInteractions.updateConsents({
@@ -686,9 +812,14 @@ def generate():
     hero_html = result if isinstance(result, str) else str(result)
     hero_html = strip_markdown_fences(hero_html)
 
-    sitemap_js = assemble_sitemap(customer_name, target_selector, hero_html)
+    card_selector = (data.get("cardSelector") or "").strip()
+    sitemap_js = assemble_sitemap_v2(target_selector, card_selector)
 
-    return jsonify(sitemap=sitemap_js)
+    return jsonify(
+        sitemap=sitemap_js,
+        heroTemplate=hero_html,
+        cardTemplate=CARD_EXPERIENCE_TEMPLATE_HTML,
+    )
 
 
 def _llm_error_message(err):
@@ -732,9 +863,7 @@ def regenerate():
     if not customer_name:
         customer_name = derive_customer_name(page_url)
 
-    previous_html = extract_transformer_html(previous_output)
-    if not previous_html:
-        previous_html = previous_output
+    previous_html = previous_output.strip()
 
     issue_lines = []
     for key in issues:
@@ -778,9 +907,14 @@ def regenerate():
     corrected_html = result if isinstance(result, str) else str(result)
     corrected_html = strip_markdown_fences(corrected_html)
 
-    sitemap_js = assemble_sitemap(customer_name, target_selector, corrected_html)
+    card_selector = (data.get("cardSelector") or "").strip()
+    sitemap_js = assemble_sitemap_v2(target_selector, card_selector)
 
-    return jsonify(sitemap=sitemap_js)
+    return jsonify(
+        sitemap=sitemap_js,
+        heroTemplate=corrected_html,
+        cardTemplate=CARD_EXPERIENCE_TEMPLATE_HTML,
+    )
 
 
 if __name__ == "__main__":

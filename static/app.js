@@ -7,8 +7,13 @@
   var targetHtmlInput = document.getElementById('target-html');
   var manualToggle = document.getElementById('manual-toggle');
   var generateBtn = document.getElementById('generate-btn');
+  var cardSelectorInput = document.getElementById('card-selector');
   var outputArea = document.getElementById('output');
+  var heroTemplateOutput = document.getElementById('hero-template-output');
+  var cardTemplateOutput = document.getElementById('card-template-output');
   var copyBtn = document.getElementById('copy-btn');
+  var copyHeroBtn = document.getElementById('copy-hero-btn');
+  var copyCardBtn = document.getElementById('copy-card-btn');
   var errorBanner = document.getElementById('error-banner');
   var extractingIndicator = document.getElementById('extracting-indicator');
 
@@ -97,10 +102,27 @@
     }
   }
 
+  function clearOutputs() {
+    outputArea.value = '';
+    heroTemplateOutput.value = '';
+    cardTemplateOutput.value = '';
+    copyBtn.disabled = true;
+    copyHeroBtn.disabled = true;
+    copyCardBtn.disabled = true;
+  }
+
+  function applyOutputs(data) {
+    outputArea.value = data.sitemap || '';
+    heroTemplateOutput.value = data.heroTemplate || '';
+    cardTemplateOutput.value = data.cardTemplate || '';
+    copyBtn.disabled = !outputArea.value;
+    copyHeroBtn.disabled = !heroTemplateOutput.value;
+    copyCardBtn.disabled = !cardTemplateOutput.value;
+  }
+
   async function detectHero() {
     clearError();
-    outputArea.value = '';
-    copyBtn.disabled = true;
+    clearOutputs();
     hideFeedbackPanel();
     extractedStyles = null;
     stylesReady = false;
@@ -153,8 +175,7 @@
 
   async function generateSitemap() {
     clearError();
-    outputArea.value = '';
-    copyBtn.disabled = true;
+    clearOutputs();
 
     var pageUrl = pageUrlInput.value.trim();
     var targetSelector = targetSelectorInput.value.trim();
@@ -176,6 +197,7 @@
           targetHtml: targetHtml,
           extractedStyles: extractedStyles,
           customerName: customerNameInput.value.trim(),
+          cardSelector: cardSelectorInput.value.trim(),
         }),
       });
       var data = await response.json().catch(function () { return {}; });
@@ -195,10 +217,9 @@
         showError('Sitemap generation returned empty output.');
         return;
       }
-      outputArea.value = data.sitemap;
-      copyBtn.disabled = false;
+      applyOutputs(data);
       showFeedbackPanel();
-      addHistoryEntry(pageUrl, data.sitemap);
+      addHistoryEntry(pageUrl, data);
     } catch (err) {
       showError(
         err.name === 'TypeError'
@@ -231,10 +252,11 @@
           targetSelector: targetSelectorInput.value.trim(),
           targetHtml: targetHtmlInput.value,
           extractedStyles: extractedStyles,
-          previousOutput: outputArea.value,
+          previousOutput: heroTemplateOutput.value,
           issues: issues,
           feedbackNote: feedbackNote.value.trim(),
           customerName: customerNameInput.value.trim(),
+          cardSelector: cardSelectorInput.value.trim(),
         }),
       });
       var data = await response.json().catch(function () { return {}; });
@@ -254,11 +276,10 @@
         showError('Regeneration returned empty output.');
         return;
       }
-      outputArea.value = data.sitemap;
-      copyBtn.disabled = false;
+      applyOutputs(data);
       hideFeedbackPanel();
       showFeedbackPanel();
-      addHistoryEntry(pageUrlInput.value.trim(), data.sitemap);
+      addHistoryEntry(pageUrlInput.value.trim(), data);
     } catch (err) {
       showError(
         err.name === 'TypeError'
@@ -293,21 +314,26 @@
   targetSelectorInput.addEventListener('input', updateGenerateEnabled);
   targetHtmlInput.addEventListener('input', updateGenerateEnabled);
 
-  copyBtn.addEventListener('click', async function () {
-    if (!outputArea.value) return;
-    try {
-      await navigator.clipboard.writeText(outputArea.value);
-      var original = copyBtn.textContent;
-      copyBtn.textContent = 'Copied!';
-      copyBtn.disabled = true;
-      setTimeout(function () {
-        copyBtn.textContent = original;
-        copyBtn.disabled = false;
-      }, 1500);
-    } catch (e) {
-      showError('Could not copy to clipboard.');
-    }
-  });
+  function wireCopyButton(btn, source) {
+    btn.addEventListener('click', async function () {
+      if (!source.value) return;
+      try {
+        await navigator.clipboard.writeText(source.value);
+        var original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.disabled = true;
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.disabled = !source.value;
+        }, 1500);
+      } catch (e) {
+        showError('Could not copy to clipboard.');
+      }
+    });
+  }
+  wireCopyButton(copyBtn, outputArea);
+  wireCopyButton(copyHeroBtn, heroTemplateOutput);
+  wireCopyButton(copyCardBtn, cardTemplateOutput);
 
   function deriveBrand(url) {
     try {
@@ -328,14 +354,16 @@
     localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, HISTORY_MAX)));
   }
 
-  function addHistoryEntry(url, sitemap) {
+  function addHistoryEntry(url, data) {
     var entries = getHistory();
     entries.unshift({
       id: String(Date.now()),
       brand: deriveBrand(url),
       url: url,
       timestamp: Date.now(),
-      sitemap: sitemap,
+      sitemap: data.sitemap || '',
+      heroTemplate: data.heroTemplate || '',
+      cardTemplate: data.cardTemplate || '',
     });
     saveHistory(entries);
     renderHistory();
@@ -389,8 +417,11 @@
     if (!entry) return;
 
     if (btn.classList.contains('history-btn--load')) {
-      outputArea.value = entry.sitemap;
-      copyBtn.disabled = false;
+      applyOutputs({
+        sitemap: entry.sitemap,
+        heroTemplate: entry.heroTemplate || '',
+        cardTemplate: entry.cardTemplate || '',
+      });
       showFeedbackPanel();
       outputArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (btn.classList.contains('history-btn--delete')) {
