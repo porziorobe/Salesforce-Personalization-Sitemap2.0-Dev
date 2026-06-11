@@ -811,6 +811,7 @@ def generate():
 
     hero_html = result if isinstance(result, str) else str(result)
     hero_html = strip_markdown_fences(hero_html)
+    hero_html = inline_extracted_styles(hero_html, extracted_styles)
 
     card_selector = (data.get("cardSelector") or "").strip()
     sitemap_js = assemble_sitemap_v2(target_selector, card_selector)
@@ -831,6 +832,23 @@ def _llm_error_message(err):
             "fewer nested containers if the problem persists."
         )
     return f"LLM generation failed: {msg}"
+
+
+_EXTRACTED_STYLES_LITERAL = re.compile(
+    r"\{\{\s*EXTRACTED_STYLES\.(\w+)\.(\w+)\s*\}\}"
+)
+
+
+def inline_extracted_styles(html, styles):
+    """Replace any leaked {{EXTRACTED_STYLES.bucket.key}} tokens with actual values."""
+    if not html or not styles:
+        return html
+
+    def _sub(match):
+        bucket, key = match.group(1), match.group(2)
+        return str(styles.get(bucket, {}).get(key, ""))
+
+    return _EXTRACTED_STYLES_LITERAL.sub(_sub, html)
 
 
 def strip_markdown_fences(text):
@@ -906,6 +924,7 @@ def regenerate():
 
     corrected_html = result if isinstance(result, str) else str(result)
     corrected_html = strip_markdown_fences(corrected_html)
+    corrected_html = inline_extracted_styles(corrected_html, extracted_styles)
 
     card_selector = (data.get("cardSelector") or "").strip()
     sitemap_js = assemble_sitemap_v2(target_selector, card_selector)
