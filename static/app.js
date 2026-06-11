@@ -26,6 +26,7 @@
   var modalTabButtons = modal.querySelectorAll('.modal-tab');
   var modalCodePanel = document.getElementById('modal-tab-code');
   var modalRefinePanel = document.getElementById('modal-tab-refine');
+  var modalRefineSoonPanel = document.getElementById('modal-tab-refine-soon');
   var modalCode = document.getElementById('modal-code');
   var modalCopyBtn = document.getElementById('modal-copy-btn');
   var feedbackNote = document.getElementById('feedback-note');
@@ -355,10 +356,13 @@
     modalTabButtons.forEach(function (btn) {
       btn.classList.toggle('is-active', btn.dataset.tab === tab);
     });
+    var refineActive = tab === 'refine';
+    var soon = currentModalArtifact === 'rec';
     modalCodePanel.hidden = tab !== 'code';
-    modalRefinePanel.hidden = tab !== 'refine';
+    modalRefinePanel.hidden = !refineActive || soon;
+    modalRefineSoonPanel.hidden = !refineActive || !soon;
     modalCopyBtn.hidden = tab !== 'code';
-    regenerateBtn.hidden = tab !== 'refine';
+    regenerateBtn.hidden = !refineActive || soon;
   }
 
   function openModal(key) {
@@ -368,13 +372,14 @@
     modalHeading.textContent = record.label;
     modalCode.value = record.value;
 
-    var showTabs = key === 'hero';
+    var showTabs = key === 'hero' || key === 'rec';
     modalTabs.hidden = !showTabs;
     if (showTabs) {
       switchModalTab('code');
     } else {
       modalCodePanel.hidden = false;
       modalRefinePanel.hidden = true;
+      modalRefineSoonPanel.hidden = true;
       modalCopyBtn.hidden = false;
       regenerateBtn.hidden = true;
     }

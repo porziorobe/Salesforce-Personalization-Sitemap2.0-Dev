@@ -14,7 +14,7 @@
           <div class="brand-mark" aria-hidden="true"><span class="brand-cloud"></span></div>
           <div class="header-titles">
             <h1 class="app-title">Personalization Sitemap Generator</h1>
-            <p class="app-subtitle">Detect hero content, extract styles, and generate Salesforce sitemap code.</p>
+            <p class="app-subtitle">Detect content, extract styles, and generate Salesforce Personalization experiences.</p>
           </div>
           <nav class="header-nav">
             <a href="#generation-history" class="header-link">History</a>
@@ -115,7 +115,7 @@
                 <span class="btn-label">Generate</span>
                 <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
               </button>
-              <button type="button" id="open-hero-btn" class="btn btn-neutral" disabled>Open</button>
+              <button type="button" id="open-hero-btn" class="btn btn-neutral" disabled>Open &amp; Refine</button>
               <button type="button" id="copy-hero-btn" class="btn btn-neutral" disabled>Copy Hero</button>
             </div>
           </div>
@@ -134,7 +134,7 @@
                 <span class="btn-label">Generate</span>
                 <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
               </button>
-              <button type="button" id="open-rec-btn" class="btn btn-neutral" disabled>Open</button>
+              <button type="button" id="open-rec-btn" class="btn btn-neutral" disabled>Open &amp; Refine</button>
               <button type="button" id="copy-rec-btn" class="btn btn-neutral" disabled>Copy Recs</button>
             </div>
           </div>
@@ -183,6 +183,9 @@
               <label class="label" for="feedback-note">Additional details (optional)</label>
               <textarea id="feedback-note" class="textarea" rows="3" placeholder="e.g. The CTA should be centered below the subheader..."></textarea>
             </div>
+          </div>
+          <div id="modal-tab-refine-soon" class="modal-tab-panel" hidden>
+            <p class="modal-intro">Refine for Recs is coming soon — once LLM generation lands, you'll be able to flag issues here and regenerate.</p>
           </div>
         </div>
         <footer class="modal-footer">
