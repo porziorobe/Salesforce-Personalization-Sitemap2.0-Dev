@@ -82,43 +82,60 @@
         <section class="panel" aria-labelledby="output-heading">
           <h2 id="output-heading" class="panel-heading">Generated artifacts</h2>
 
-          <div class="output-block">
-            <h3 class="output-subheading">1. Sitemap JS <span class="output-hint">— deploy to site</span></h3>
-            <label class="label visually-hidden" for="output">Sitemap JavaScript output</label>
-            <textarea id="output" class="textarea output-area" rows="12" readonly placeholder="Click Generate to produce the sitemap JS."></textarea>
-            <div class="actions actions-output">
+          <div class="artifact-row" data-artifact="sitemap">
+            <div class="artifact-info">
+              <span class="artifact-name">1. Sitemap JS</span>
+              <span class="artifact-hint">deploy to site</span>
+              <span class="artifact-status" data-state="empty">
+                <span class="status-dot"></span>
+                <span class="status-text">Not generated</span>
+              </span>
+            </div>
+            <div class="artifact-actions">
               <button type="button" id="generate-sitemap-btn" class="btn btn-primary" disabled>
-                <span class="btn-label">Generate Sitemap</span>
+                <span class="btn-label">Generate</span>
                 <span class="btn-loading" hidden aria-hidden="true">Assembling...</span>
               </button>
-              <button type="button" id="copy-btn" class="btn btn-neutral" disabled>Copy</button>
+              <button type="button" id="open-sitemap-btn" class="btn btn-neutral" disabled>Open</button>
+              <button type="button" id="copy-btn" class="btn btn-neutral" disabled>Copy Sitemap</button>
             </div>
           </div>
 
-          <div class="output-block">
-            <h3 class="output-subheading">2. Hero Experience Template <span class="output-hint">— paste into WPM Experience Template</span></h3>
-            <label class="label visually-hidden" for="hero-template-output">Hero Experience Template HTML</label>
-            <textarea id="hero-template-output" class="textarea output-area" rows="12" readonly placeholder="Click Generate to call the LLM."></textarea>
-            <div class="actions actions-output">
+          <div class="artifact-row" data-artifact="hero">
+            <div class="artifact-info">
+              <span class="artifact-name">2. Hero Experience Template</span>
+              <span class="artifact-hint">paste into WPM Experience Template</span>
+              <span class="artifact-status" data-state="empty">
+                <span class="status-dot"></span>
+                <span class="status-text">Not generated</span>
+              </span>
+            </div>
+            <div class="artifact-actions">
               <button type="button" id="generate-hero-btn" class="btn btn-primary" disabled>
-                <span class="btn-label">Generate Hero</span>
+                <span class="btn-label">Generate</span>
                 <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
               </button>
-              <button type="button" id="copy-hero-btn" class="btn btn-neutral" disabled>Copy</button>
-              <button type="button" id="hero-feedback-btn" class="btn btn-neutral" disabled>Refine with feedback</button>
+              <button type="button" id="open-hero-btn" class="btn btn-neutral" disabled>Open</button>
+              <button type="button" id="copy-hero-btn" class="btn btn-neutral" disabled>Copy Hero</button>
             </div>
           </div>
 
-          <div class="output-block">
-            <h3 class="output-subheading">3. Recommendations Experience Template <span class="output-hint">— static placeholder; LLM generation coming next</span></h3>
-            <label class="label visually-hidden" for="rec-template-output">Recommendations Experience Template HTML</label>
-            <textarea id="rec-template-output" class="textarea output-area" rows="10" readonly placeholder="Click Generate to produce the placeholder template."></textarea>
-            <div class="actions actions-output">
+          <div class="artifact-row" data-artifact="rec">
+            <div class="artifact-info">
+              <span class="artifact-name">3. Recommendations Experience Template</span>
+              <span class="artifact-hint">static placeholder; LLM generation coming next</span>
+              <span class="artifact-status" data-state="empty">
+                <span class="status-dot"></span>
+                <span class="status-text">Not generated</span>
+              </span>
+            </div>
+            <div class="artifact-actions">
               <button type="button" id="generate-rec-btn" class="btn btn-primary">
-                <span class="btn-label">Generate Recommendations</span>
+                <span class="btn-label">Generate</span>
                 <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
               </button>
-              <button type="button" id="copy-rec-btn" class="btn btn-neutral" disabled>Copy</button>
+              <button type="button" id="open-rec-btn" class="btn btn-neutral" disabled>Open</button>
+              <button type="button" id="copy-rec-btn" class="btn btn-neutral" disabled>Copy Recommendations</button>
             </div>
           </div>
         </section>
@@ -130,7 +147,7 @@
           <button type="button" id="clear-history-btn" class="history-clear" hidden>Clear All</button>
         </div>
         <div id="history-list" class="history-list">
-          <p class="history-empty">No sitemaps generated yet.</p>
+          <p class="history-empty">No artifacts generated yet.</p>
         </div>
       </section>
 
@@ -139,29 +156,39 @@
       </footer>
     </div>
 
-    <div id="feedback-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="feedback-modal-heading">
+    <div id="artifact-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="artifact-modal-heading">
       <div class="modal-backdrop" data-close-modal></div>
-      <div class="modal-content">
+      <div class="modal-content modal-content-wide">
         <header class="modal-header">
-          <h3 id="feedback-modal-heading">Refine Hero with Feedback</h3>
+          <h3 id="artifact-modal-heading">Artifact</h3>
           <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
         </header>
+        <div id="modal-tabs" class="modal-tabs" hidden>
+          <button type="button" class="modal-tab is-active" data-tab="code">Code</button>
+          <button type="button" class="modal-tab" data-tab="refine">Refine with Feedback</button>
+        </div>
         <div class="modal-body">
-          <p class="modal-intro">Select what's wrong and re-run the LLM with corrections.</p>
-          <div class="feedback-checks">
-            <label class="check-label"><input type="checkbox" name="fb-issue" value="background_image" /> Background image not showing</label>
-            <label class="check-label"><input type="checkbox" name="fb-issue" value="text_content" /> Header or subheader wrong</label>
-            <label class="check-label"><input type="checkbox" name="fb-issue" value="cta_missing" /> CTA button missing or wrong</label>
-            <label class="check-label"><input type="checkbox" name="fb-issue" value="layout_wrong" /> Layout doesn't match original</label>
+          <div id="modal-tab-code" class="modal-tab-panel">
+            <textarea id="modal-code" class="textarea output-area" rows="18" readonly></textarea>
           </div>
-          <div class="field">
-            <label class="label" for="feedback-note">Additional details (optional)</label>
-            <textarea id="feedback-note" class="textarea" rows="3" placeholder="e.g. The CTA should be centered below the subheader..."></textarea>
+          <div id="modal-tab-refine" class="modal-tab-panel" hidden>
+            <p class="modal-intro">Select what's wrong and re-run the LLM with corrections.</p>
+            <div class="feedback-checks">
+              <label class="check-label"><input type="checkbox" name="fb-issue" value="background_image" /> Background image not showing</label>
+              <label class="check-label"><input type="checkbox" name="fb-issue" value="text_content" /> Header or subheader wrong</label>
+              <label class="check-label"><input type="checkbox" name="fb-issue" value="cta_missing" /> CTA button missing or wrong</label>
+              <label class="check-label"><input type="checkbox" name="fb-issue" value="layout_wrong" /> Layout doesn't match original</label>
+            </div>
+            <div class="field">
+              <label class="label" for="feedback-note">Additional details (optional)</label>
+              <textarea id="feedback-note" class="textarea" rows="3" placeholder="e.g. The CTA should be centered below the subheader..."></textarea>
+            </div>
           </div>
         </div>
         <footer class="modal-footer">
-          <button type="button" class="btn btn-neutral" data-close-modal>Cancel</button>
-          <button type="button" id="regenerate-btn" class="btn btn-primary" disabled>
+          <button type="button" class="btn btn-neutral" data-close-modal>Close</button>
+          <button type="button" id="modal-copy-btn" class="btn btn-neutral">Copy</button>
+          <button type="button" id="regenerate-btn" class="btn btn-primary" hidden disabled>
             <span class="btn-label">Regenerate Hero</span>
             <span class="btn-loading" hidden aria-hidden="true">Regenerating...</span>
           </button>

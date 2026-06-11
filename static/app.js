@@ -12,16 +12,22 @@
   var generateHeroBtn = document.getElementById('generate-hero-btn');
   var generateRecBtn = document.getElementById('generate-rec-btn');
 
-  var outputArea = document.getElementById('output');
-  var heroTemplateOutput = document.getElementById('hero-template-output');
-  var recTemplateOutput = document.getElementById('rec-template-output');
+  var openSitemapBtn = document.getElementById('open-sitemap-btn');
+  var openHeroBtn = document.getElementById('open-hero-btn');
+  var openRecBtn = document.getElementById('open-rec-btn');
 
   var copyBtn = document.getElementById('copy-btn');
   var copyHeroBtn = document.getElementById('copy-hero-btn');
   var copyRecBtn = document.getElementById('copy-rec-btn');
 
-  var heroFeedbackBtn = document.getElementById('hero-feedback-btn');
-  var feedbackModal = document.getElementById('feedback-modal');
+  var modal = document.getElementById('artifact-modal');
+  var modalHeading = document.getElementById('artifact-modal-heading');
+  var modalTabs = document.getElementById('modal-tabs');
+  var modalTabButtons = modal.querySelectorAll('.modal-tab');
+  var modalCodePanel = document.getElementById('modal-tab-code');
+  var modalRefinePanel = document.getElementById('modal-tab-refine');
+  var modalCode = document.getElementById('modal-code');
+  var modalCopyBtn = document.getElementById('modal-copy-btn');
   var feedbackNote = document.getElementById('feedback-note');
   var regenerateBtn = document.getElementById('regenerate-btn');
   var issueCheckboxes = document.querySelectorAll('input[name="fb-issue"]');
@@ -36,6 +42,17 @@
 
   var extractedStyles = null;
   var stylesReady = false;
+
+  var artifacts = {
+    sitemap: { value: '', state: 'empty', label: '1. Sitemap JS' },
+    hero: { value: '', state: 'empty', label: '2. Hero Experience Template' },
+    rec: { value: '', state: 'empty', label: '3. Recommendations Experience Template' },
+  };
+
+  var openButtons = { sitemap: openSitemapBtn, hero: openHeroBtn, rec: openRecBtn };
+  var copyButtons = { sitemap: copyBtn, hero: copyHeroBtn, rec: copyRecBtn };
+
+  var currentModalArtifact = null;
 
   var TIMEOUT_MSG = 'The AI service timed out — try again, or pick a simpler parent element if the problem persists.';
 
@@ -67,8 +84,32 @@
 
   function refreshSectionButtons() {
     var ready = heroInputsReady();
-    generateSitemapBtn.disabled = !ready;
-    generateHeroBtn.disabled = !ready;
+    if (artifacts.sitemap.state !== 'generating') generateSitemapBtn.disabled = !ready;
+    if (artifacts.hero.state !== 'generating') generateHeroBtn.disabled = !ready;
+  }
+
+  var STATUS_LABELS = {
+    empty: 'Not generated',
+    generating: 'Generating…',
+    ready: 'Ready',
+    failed: 'Failed',
+  };
+
+  function setArtifactState(key, state, value) {
+    var record = artifacts[key];
+    record.state = state;
+    if (typeof value === 'string') record.value = value;
+
+    var row = document.querySelector('.artifact-row[data-artifact="' + key + '"]');
+    if (row) {
+      var chip = row.querySelector('.artifact-status');
+      chip.dataset.state = state;
+      chip.querySelector('.status-text').textContent = STATUS_LABELS[state];
+    }
+
+    var hasValue = !!record.value;
+    openButtons[key].disabled = !hasValue;
+    copyButtons[key].disabled = !hasValue;
   }
 
   async function extractStyles(pageUrl, targetSelector) {
@@ -143,6 +184,7 @@
       showError('Detect or fill in the hero element first.');
       return;
     }
+    setArtifactState('sitemap', 'generating');
     setBtnLoading(generateSitemapBtn, true);
     try {
       var response = await fetch('/assemble-sitemap', {
@@ -155,16 +197,18 @@
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
+        setArtifactState('sitemap', 'failed');
         showError(data.error || 'Sitemap assembly failed.');
         return;
       }
-      outputArea.value = data.sitemap || '';
-      copyBtn.disabled = !outputArea.value;
+      setArtifactState('sitemap', 'ready', data.sitemap || '');
       addHistoryEntry(pageUrlInput.value.trim(), { sitemap: data.sitemap });
     } catch (err) {
+      setArtifactState('sitemap', 'failed');
       showError('Network error during sitemap assembly. Try again.');
     } finally {
       setBtnLoading(generateSitemapBtn, false);
+      refreshSectionButtons();
     }
   }
 
@@ -178,6 +222,7 @@
       return;
     }
 
+    setArtifactState('hero', 'generating');
     setBtnLoading(generateHeroBtn, true);
     try {
       var response = await fetch('/generate', {
@@ -193,27 +238,30 @@
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
+        setArtifactState('hero', 'failed');
         if (response.status >= 502 && response.status <= 504) showError(TIMEOUT_MSG);
         else showError(data.error || 'Hero generation failed (' + response.status + ').');
         return;
       }
       if (!data.heroTemplate) {
+        setArtifactState('hero', 'failed');
         showError('Hero generation returned empty output.');
         return;
       }
-      heroTemplateOutput.value = data.heroTemplate;
-      copyHeroBtn.disabled = false;
-      heroFeedbackBtn.disabled = false;
+      setArtifactState('hero', 'ready', data.heroTemplate);
       addHistoryEntry(pageUrl, { heroTemplate: data.heroTemplate });
     } catch (err) {
+      setArtifactState('hero', 'failed');
       showError(err.name === 'TypeError' ? TIMEOUT_MSG : 'Network error during hero generation. Try again.');
     } finally {
       setBtnLoading(generateHeroBtn, false);
+      refreshSectionButtons();
     }
   }
 
   async function generateRecommendations() {
     clearError();
+    setArtifactState('rec', 'generating');
     setBtnLoading(generateRecBtn, true);
     try {
       var response = await fetch('/recommendations-template', {
@@ -223,12 +271,13 @@
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
+        setArtifactState('rec', 'failed');
         showError(data.error || 'Recommendations template failed.');
         return;
       }
-      recTemplateOutput.value = data.recTemplate || '';
-      copyRecBtn.disabled = !recTemplateOutput.value;
+      setArtifactState('rec', 'ready', data.recTemplate || '');
     } catch (err) {
+      setArtifactState('rec', 'failed');
       showError('Network error during recommendations generation. Try again.');
     } finally {
       setBtnLoading(generateRecBtn, false);
@@ -245,6 +294,7 @@
     }
 
     setBtnLoading(regenerateBtn, true);
+    setArtifactState('hero', 'generating');
     try {
       var response = await fetch('/regenerate', {
         method: 'POST',
@@ -254,7 +304,7 @@
           targetSelector: targetSelectorInput.value.trim(),
           targetHtml: targetHtmlInput.value,
           extractedStyles: extractedStyles,
-          previousOutput: heroTemplateOutput.value,
+          previousOutput: artifacts.hero.value,
           issues: issues,
           feedbackNote: note,
           customerName: customerNameInput.value.trim(),
@@ -262,19 +312,23 @@
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
+        setArtifactState('hero', 'failed');
         if (response.status >= 502 && response.status <= 504) showError(TIMEOUT_MSG);
         else showError(data.error || 'Regeneration failed (' + response.status + ').');
         return;
       }
       if (!data.heroTemplate) {
+        setArtifactState('hero', 'failed');
         showError('Regeneration returned empty output.');
         return;
       }
-      heroTemplateOutput.value = data.heroTemplate;
-      copyHeroBtn.disabled = false;
+      setArtifactState('hero', 'ready', data.heroTemplate);
       addHistoryEntry(pageUrlInput.value.trim(), { heroTemplate: data.heroTemplate });
-      closeFeedbackModal();
+      modalCode.value = data.heroTemplate;
+      switchModalTab('code');
+      resetFeedbackForm();
     } catch (err) {
+      setArtifactState('hero', 'failed');
       showError(err.name === 'TypeError' ? TIMEOUT_MSG : 'Network error during regeneration. Try again.');
     } finally {
       setBtnLoading(regenerateBtn, false);
@@ -291,19 +345,49 @@
     regenerateBtn.disabled = getCheckedIssues().length === 0 && !feedbackNote.value.trim();
   }
 
-  function openFeedbackModal() {
-    if (!heroTemplateOutput.value) return;
-    feedbackModal.hidden = false;
-    document.body.classList.add('modal-open');
-    updateRegenerateEnabled();
-  }
-
-  function closeFeedbackModal() {
-    feedbackModal.hidden = true;
-    document.body.classList.remove('modal-open');
+  function resetFeedbackForm() {
     feedbackNote.value = '';
     issueCheckboxes.forEach(function (cb) { cb.checked = false; });
     regenerateBtn.disabled = true;
+  }
+
+  function switchModalTab(tab) {
+    modalTabButtons.forEach(function (btn) {
+      btn.classList.toggle('is-active', btn.dataset.tab === tab);
+    });
+    modalCodePanel.hidden = tab !== 'code';
+    modalRefinePanel.hidden = tab !== 'refine';
+    modalCopyBtn.hidden = tab !== 'code';
+    regenerateBtn.hidden = tab !== 'refine';
+  }
+
+  function openModal(key) {
+    var record = artifacts[key];
+    if (!record.value) return;
+    currentModalArtifact = key;
+    modalHeading.textContent = record.label;
+    modalCode.value = record.value;
+
+    var showTabs = key === 'hero';
+    modalTabs.hidden = !showTabs;
+    if (showTabs) {
+      switchModalTab('code');
+    } else {
+      modalCodePanel.hidden = false;
+      modalRefinePanel.hidden = true;
+      modalCopyBtn.hidden = false;
+      regenerateBtn.hidden = true;
+    }
+
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+    currentModalArtifact = null;
+    resetFeedbackForm();
   }
 
   pageUrlInput.addEventListener('blur', function () {
@@ -316,14 +400,20 @@
   generateSitemapBtn.addEventListener('click', generateSitemap);
   generateHeroBtn.addEventListener('click', generateHero);
   generateRecBtn.addEventListener('click', generateRecommendations);
-  heroFeedbackBtn.addEventListener('click', openFeedbackModal);
+  openSitemapBtn.addEventListener('click', function () { openModal('sitemap'); });
+  openHeroBtn.addEventListener('click', function () { openModal('hero'); });
+  openRecBtn.addEventListener('click', function () { openModal('rec'); });
   regenerateBtn.addEventListener('click', regenerateHeroWithFeedback);
 
-  feedbackModal.addEventListener('click', function (e) {
-    if (e.target.hasAttribute('data-close-modal')) closeFeedbackModal();
+  modalTabButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () { switchModalTab(btn.dataset.tab); });
+  });
+
+  modal.addEventListener('click', function (e) {
+    if (e.target.hasAttribute('data-close-modal')) closeModal();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !feedbackModal.hidden) closeFeedbackModal();
+    if (e.key === 'Escape' && !modal.hidden) closeModal();
   });
 
   issueCheckboxes.forEach(function (cb) { cb.addEventListener('change', updateRegenerateEnabled); });
@@ -333,26 +423,31 @@
   targetSelectorInput.addEventListener('input', refreshSectionButtons);
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
-  function wireCopyButton(btn, source) {
+  function copyAction(btn, getValue) {
     btn.addEventListener('click', async function () {
-      if (!source.value) return;
+      var value = getValue();
+      if (!value) return;
       try {
-        await navigator.clipboard.writeText(source.value);
+        await navigator.clipboard.writeText(value);
         var original = btn.textContent;
         btn.textContent = 'Copied!';
+        var wasDisabled = btn.disabled;
         btn.disabled = true;
         setTimeout(function () {
           btn.textContent = original;
-          btn.disabled = !source.value;
+          btn.disabled = wasDisabled || !getValue();
         }, 1500);
       } catch (e) {
         showError('Could not copy to clipboard.');
       }
     });
   }
-  wireCopyButton(copyBtn, outputArea);
-  wireCopyButton(copyHeroBtn, heroTemplateOutput);
-  wireCopyButton(copyRecBtn, recTemplateOutput);
+  copyAction(copyBtn, function () { return artifacts.sitemap.value; });
+  copyAction(copyHeroBtn, function () { return artifacts.hero.value; });
+  copyAction(copyRecBtn, function () { return artifacts.rec.value; });
+  copyAction(modalCopyBtn, function () {
+    return currentModalArtifact ? artifacts[currentModalArtifact].value : '';
+  });
 
   function deriveBrand(url) {
     try {
@@ -436,14 +531,10 @@
     if (!entry) return;
 
     if (btn.classList.contains('history-btn--load')) {
-      if (entry.sitemap) { outputArea.value = entry.sitemap; copyBtn.disabled = false; }
-      if (entry.heroTemplate) {
-        heroTemplateOutput.value = entry.heroTemplate;
-        copyHeroBtn.disabled = false;
-        heroFeedbackBtn.disabled = false;
-      }
-      if (entry.recTemplate) { recTemplateOutput.value = entry.recTemplate; copyRecBtn.disabled = false; }
-      outputArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (entry.sitemap) setArtifactState('sitemap', 'ready', entry.sitemap);
+      if (entry.heroTemplate) setArtifactState('hero', 'ready', entry.heroTemplate);
+      if (entry.recTemplate) setArtifactState('rec', 'ready', entry.recTemplate);
+      document.querySelector('[aria-labelledby="output-heading"]').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (btn.classList.contains('history-btn--delete')) {
       deleteHistoryEntry(id);
     }
