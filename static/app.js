@@ -509,10 +509,10 @@
     historyList.innerHTML = entries.map(function (entry) {
       return '<div class="history-card" data-id="' + entry.id + '">'
         + '<div class="history-card-info">'
-        + '<span class="history-brand">' + entry.brand + '</span>'
+        + '<span class="history-brand" title="' + entry.brand + '">' + entry.brand + '</span>'
         + '<span class="history-url" title="' + entry.url + '">' + entry.url + '</span>'
-        + '</div>'
         + '<span class="history-time">' + timeAgo(entry.timestamp) + '</span>'
+        + '</div>'
         + '<div class="history-actions">'
         + '<button type="button" class="history-btn history-btn--load">Load</button>'
         + '<button type="button" class="history-btn history-btn--delete">Delete</button>'
