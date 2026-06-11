@@ -25,26 +25,15 @@
       <main class="app-main" role="main">
         <section class="panel" aria-labelledby="inputs-heading">
           <h2 id="inputs-heading" class="panel-heading">Inputs</h2>
+          <div id="error-banner" class="banner banner-error" role="alert" hidden></div>
           <form id="workflow-form" class="form" novalidate>
             <div class="field">
               <label class="label" for="page-url">Customer Website URL</label>
-              <input
-                id="page-url"
-                type="url"
-                class="input"
-                placeholder="https://www.example.com/"
-                autocomplete="url"
-                required
-              />
+              <input id="page-url" type="url" class="input" placeholder="https://www.example.com/" autocomplete="url" required />
             </div>
             <div class="field">
               <label class="label" for="customer-name">Customer Name</label>
-              <input
-                id="customer-name"
-                type="text"
-                class="input"
-                placeholder="Auto-filled from URL (e.g. Ahead)"
-              />
+              <input id="customer-name" type="text" class="input" placeholder="Auto-filled from URL (e.g. Ahead)" />
             </div>
             <div class="actions">
               <button type="button" id="detect-btn" class="btn btn-primary">
@@ -55,6 +44,7 @@
             </div>
 
             <div id="detected-fields" hidden>
+              <h3 class="subsection-heading">Hero</h3>
               <div class="field">
                 <label class="label" for="target-selector">CSS Selector</label>
                 <input id="target-selector" type="text" class="input" readonly />
@@ -69,20 +59,21 @@
                   Looks wrong? Edit manually
                 </label>
               </div>
+
+              <h3 class="subsection-heading">Recommendations <span class="coming-soon">Coming soon! A working but unbranded placeholder will be generated.</span></h3>
               <div class="field">
-                <label class="label" for="card-selector">Content Card Selector <span class="label-hint">(optional placeholder — static template)</span></label>
-                <input
-                  id="card-selector"
-                  type="text"
-                  class="input"
-                  placeholder="e.g. #recommendations or .product-grid"
-                />
+                <label class="label" for="rec-selector">CSS Selector</label>
+                <input id="rec-selector" type="text" class="input" disabled placeholder="Auto-detected in a future release" />
               </div>
-              <div class="actions">
-                <button type="button" id="generate-btn" class="btn btn-primary" disabled>
-                  <span class="btn-label">Generate Sitemap</span>
-                  <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
-                </button>
+              <div class="field">
+                <label class="label" for="rec-html">Element HTML</label>
+                <textarea id="rec-html" class="textarea textarea-tall" rows="6" disabled placeholder="Auto-detected in a future release"></textarea>
+              </div>
+              <div class="toggle-row">
+                <label class="toggle-label toggle-disabled" for="rec-manual-toggle">
+                  <input type="checkbox" id="rec-manual-toggle" disabled />
+                  Looks wrong? Edit manually
+                </label>
               </div>
             </div>
           </form>
@@ -90,70 +81,44 @@
 
         <section class="panel" aria-labelledby="output-heading">
           <h2 id="output-heading" class="panel-heading">Generated artifacts</h2>
-          <div id="error-banner" class="banner banner-error" role="alert" hidden></div>
 
           <div class="output-block">
             <h3 class="output-subheading">1. Sitemap JS <span class="output-hint">— deploy to site</span></h3>
             <label class="label visually-hidden" for="output">Sitemap JavaScript output</label>
-            <textarea
-              id="output"
-              class="textarea output-area"
-              rows="14"
-              readonly
-              placeholder="Sitemap JavaScript will appear here."
-            ></textarea>
+            <textarea id="output" class="textarea output-area" rows="12" readonly placeholder="Click Generate to produce the sitemap JS."></textarea>
             <div class="actions actions-output">
-              <button type="button" id="copy-btn" class="btn btn-neutral" disabled>Copy Sitemap</button>
+              <button type="button" id="generate-sitemap-btn" class="btn btn-primary" disabled>
+                <span class="btn-label">Generate Sitemap</span>
+                <span class="btn-loading" hidden aria-hidden="true">Assembling...</span>
+              </button>
+              <button type="button" id="copy-btn" class="btn btn-neutral" disabled>Copy</button>
             </div>
           </div>
 
           <div class="output-block">
             <h3 class="output-subheading">2. Hero Experience Template <span class="output-hint">— paste into WPM Experience Template</span></h3>
             <label class="label visually-hidden" for="hero-template-output">Hero Experience Template HTML</label>
-            <textarea
-              id="hero-template-output"
-              class="textarea output-area"
-              rows="12"
-              readonly
-              placeholder="Hero template HTML will appear here."
-            ></textarea>
+            <textarea id="hero-template-output" class="textarea output-area" rows="12" readonly placeholder="Click Generate to call the LLM."></textarea>
             <div class="actions actions-output">
-              <button type="button" id="copy-hero-btn" class="btn btn-neutral" disabled>Copy Hero Template</button>
+              <button type="button" id="generate-hero-btn" class="btn btn-primary" disabled>
+                <span class="btn-label">Generate Hero</span>
+                <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
+              </button>
+              <button type="button" id="copy-hero-btn" class="btn btn-neutral" disabled>Copy</button>
+              <button type="button" id="hero-feedback-btn" class="btn btn-neutral" disabled>Refine with feedback</button>
             </div>
           </div>
 
           <div class="output-block">
-            <h3 class="output-subheading">3. Content Card Experience Template <span class="output-hint">— static placeholder; LLM generation coming next</span></h3>
-            <label class="label visually-hidden" for="card-template-output">Content Card Experience Template HTML</label>
-            <textarea
-              id="card-template-output"
-              class="textarea output-area"
-              rows="10"
-              readonly
-              placeholder="Card template HTML will appear here."
-            ></textarea>
+            <h3 class="output-subheading">3. Recommendations Experience Template <span class="output-hint">— static placeholder; LLM generation coming next</span></h3>
+            <label class="label visually-hidden" for="rec-template-output">Recommendations Experience Template HTML</label>
+            <textarea id="rec-template-output" class="textarea output-area" rows="10" readonly placeholder="Click Generate to produce the placeholder template."></textarea>
             <div class="actions actions-output">
-              <button type="button" id="copy-card-btn" class="btn btn-neutral" disabled>Copy Card Template</button>
-            </div>
-          </div>
-
-          <div id="feedback-panel" class="feedback-panel" hidden>
-            <h3 class="feedback-heading">Not quite right? Select issues and regenerate.</h3>
-            <div class="feedback-checks">
-              <label class="check-label"><input type="checkbox" name="fb-issue" value="background_image" /> Background image not showing</label>
-              <label class="check-label"><input type="checkbox" name="fb-issue" value="text_content" /> Header or subheader wrong</label>
-              <label class="check-label"><input type="checkbox" name="fb-issue" value="cta_missing" /> CTA button missing or wrong</label>
-              <label class="check-label"><input type="checkbox" name="fb-issue" value="layout_wrong" /> Layout doesn't match original</label>
-            </div>
-            <div class="field">
-              <label class="label" for="feedback-note">Additional details (optional)</label>
-              <textarea id="feedback-note" class="textarea" rows="3" placeholder="e.g. The CTA should be centered below the subheader..."></textarea>
-            </div>
-            <div class="actions">
-              <button type="button" id="regenerate-btn" class="btn btn-primary" disabled>
-                <span class="btn-label">Regenerate with Feedback</span>
-                <span class="btn-loading" hidden aria-hidden="true">Regenerating...</span>
+              <button type="button" id="generate-rec-btn" class="btn btn-primary">
+                <span class="btn-label">Generate Recommendations</span>
+                <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
               </button>
+              <button type="button" id="copy-rec-btn" class="btn btn-neutral" disabled>Copy</button>
             </div>
           </div>
         </section>
@@ -172,6 +137,36 @@
       <footer class="app-footer" role="contentinfo">
         <p>Designed for Salesforce sales engineers. Powered by Einstein LLM via Salesforce Connected App.</p>
       </footer>
+    </div>
+
+    <div id="feedback-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="feedback-modal-heading">
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-content">
+        <header class="modal-header">
+          <h3 id="feedback-modal-heading">Refine Hero with Feedback</h3>
+          <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="modal-intro">Select what's wrong and re-run the LLM with corrections.</p>
+          <div class="feedback-checks">
+            <label class="check-label"><input type="checkbox" name="fb-issue" value="background_image" /> Background image not showing</label>
+            <label class="check-label"><input type="checkbox" name="fb-issue" value="text_content" /> Header or subheader wrong</label>
+            <label class="check-label"><input type="checkbox" name="fb-issue" value="cta_missing" /> CTA button missing or wrong</label>
+            <label class="check-label"><input type="checkbox" name="fb-issue" value="layout_wrong" /> Layout doesn't match original</label>
+          </div>
+          <div class="field">
+            <label class="label" for="feedback-note">Additional details (optional)</label>
+            <textarea id="feedback-note" class="textarea" rows="3" placeholder="e.g. The CTA should be centered below the subheader..."></textarea>
+          </div>
+        </div>
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-neutral" data-close-modal>Cancel</button>
+          <button type="button" id="regenerate-btn" class="btn btn-primary" disabled>
+            <span class="btn-label">Regenerate Hero</span>
+            <span class="btn-loading" hidden aria-hidden="true">Regenerating...</span>
+          </button>
+        </footer>
+      </div>
     </div>
 
     <script src="/static/app.js"></script>

@@ -6,21 +6,28 @@
   var targetSelectorInput = document.getElementById('target-selector');
   var targetHtmlInput = document.getElementById('target-html');
   var manualToggle = document.getElementById('manual-toggle');
-  var generateBtn = document.getElementById('generate-btn');
-  var cardSelectorInput = document.getElementById('card-selector');
+  var recSelectorInput = document.getElementById('rec-selector');
+
+  var generateSitemapBtn = document.getElementById('generate-sitemap-btn');
+  var generateHeroBtn = document.getElementById('generate-hero-btn');
+  var generateRecBtn = document.getElementById('generate-rec-btn');
+
   var outputArea = document.getElementById('output');
   var heroTemplateOutput = document.getElementById('hero-template-output');
-  var cardTemplateOutput = document.getElementById('card-template-output');
+  var recTemplateOutput = document.getElementById('rec-template-output');
+
   var copyBtn = document.getElementById('copy-btn');
   var copyHeroBtn = document.getElementById('copy-hero-btn');
-  var copyCardBtn = document.getElementById('copy-card-btn');
-  var errorBanner = document.getElementById('error-banner');
-  var extractingIndicator = document.getElementById('extracting-indicator');
+  var copyRecBtn = document.getElementById('copy-rec-btn');
 
-  var feedbackPanel = document.getElementById('feedback-panel');
+  var heroFeedbackBtn = document.getElementById('hero-feedback-btn');
+  var feedbackModal = document.getElementById('feedback-modal');
   var feedbackNote = document.getElementById('feedback-note');
   var regenerateBtn = document.getElementById('regenerate-btn');
   var issueCheckboxes = document.querySelectorAll('input[name="fb-issue"]');
+
+  var errorBanner = document.getElementById('error-banner');
+  var extractingIndicator = document.getElementById('extracting-indicator');
 
   var historyList = document.getElementById('history-list');
   var clearHistoryBtn = document.getElementById('clear-history-btn');
@@ -30,10 +37,13 @@
   var extractedStyles = null;
   var stylesReady = false;
 
+  var TIMEOUT_MSG = 'The AI service timed out — try again, or pick a simpler parent element if the problem persists.';
+
   function setBtnLoading(btn, loading) {
     btn.disabled = loading;
     btn.classList.toggle('is-loading', loading);
-    btn.querySelector('.btn-loading').hidden = !loading;
+    var loadingEl = btn.querySelector('.btn-loading');
+    if (loadingEl) loadingEl.hidden = !loading;
   }
 
   function showError(message) {
@@ -51,39 +61,19 @@
     targetHtmlInput.readOnly = !editable;
   }
 
-  function updateGenerateEnabled() {
-    var manualHasContent = targetSelectorInput.value.trim() && targetHtmlInput.value.trim();
-    generateBtn.disabled = !(stylesReady || manualHasContent);
+  function heroInputsReady() {
+    return targetSelectorInput.value.trim() && targetHtmlInput.value.trim();
   }
 
-  function showFeedbackPanel() {
-    feedbackPanel.hidden = false;
-    updateRegenerateEnabled();
-  }
-
-  function hideFeedbackPanel() {
-    feedbackPanel.hidden = true;
-    feedbackNote.value = '';
-    issueCheckboxes.forEach(function (cb) { cb.checked = false; });
-    regenerateBtn.disabled = true;
-  }
-
-  function getCheckedIssues() {
-    var issues = [];
-    issueCheckboxes.forEach(function (cb) {
-      if (cb.checked) issues.push(cb.value);
-    });
-    return issues;
-  }
-
-  function updateRegenerateEnabled() {
-    regenerateBtn.disabled = getCheckedIssues().length === 0 && !feedbackNote.value.trim();
+  function refreshSectionButtons() {
+    var ready = heroInputsReady();
+    generateSitemapBtn.disabled = !ready;
+    generateHeroBtn.disabled = !ready;
   }
 
   async function extractStyles(pageUrl, targetSelector) {
     extractingIndicator.hidden = false;
     stylesReady = false;
-    updateGenerateEnabled();
     try {
       var response = await fetch('/extract-styles', {
         method: 'POST',
@@ -91,43 +81,16 @@
         body: JSON.stringify({ pageUrl: pageUrl, targetSelector: targetSelector }),
       });
       var data = await response.json().catch(function () { return {}; });
-      if (!response.ok) {
-        throw new Error(data.error || 'Style extraction failed.');
-      }
+      if (!response.ok) throw new Error(data.error || 'Style extraction failed.');
       extractedStyles = data.extractedStyles || null;
       stylesReady = true;
-      updateGenerateEnabled();
     } finally {
       extractingIndicator.hidden = true;
     }
   }
 
-  function clearOutputs() {
-    outputArea.value = '';
-    heroTemplateOutput.value = '';
-    cardTemplateOutput.value = '';
-    copyBtn.disabled = true;
-    copyHeroBtn.disabled = true;
-    copyCardBtn.disabled = true;
-  }
-
-  function applyOutputs(data) {
-    outputArea.value = data.sitemap || '';
-    heroTemplateOutput.value = data.heroTemplate || '';
-    cardTemplateOutput.value = data.cardTemplate || '';
-    copyBtn.disabled = !outputArea.value;
-    copyHeroBtn.disabled = !heroTemplateOutput.value;
-    copyCardBtn.disabled = !cardTemplateOutput.value;
-  }
-
   async function detectHero() {
     clearError();
-    clearOutputs();
-    hideFeedbackPanel();
-    extractedStyles = null;
-    stylesReady = false;
-    updateGenerateEnabled();
-
     var pageUrl = pageUrlInput.value.trim();
     if (!pageUrl) {
       showError('Please enter a Customer Website URL.');
@@ -147,7 +110,7 @@
         detectedFields.hidden = false;
         manualToggle.checked = true;
         setEditable(true);
-        updateGenerateEnabled();
+        refreshSectionButtons();
         return;
       }
 
@@ -162,12 +125,13 @@
       } catch (extractErr) {
         showError(extractErr.message || 'Style extraction failed.');
       }
+      refreshSectionButtons();
     } catch (err) {
       showError('Could not access this site automatically. Enter the CSS selector and element HTML below.');
       detectedFields.hidden = false;
       manualToggle.checked = true;
       setEditable(true);
-      updateGenerateEnabled();
+      refreshSectionButtons();
     } finally {
       setBtnLoading(detectBtn, false);
     }
@@ -175,18 +139,46 @@
 
   async function generateSitemap() {
     clearError();
-    clearOutputs();
+    if (!heroInputsReady()) {
+      showError('Detect or fill in the hero element first.');
+      return;
+    }
+    setBtnLoading(generateSitemapBtn, true);
+    try {
+      var response = await fetch('/assemble-sitemap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          heroSelector: targetSelectorInput.value.trim(),
+          recSelector: recSelectorInput.value.trim(),
+        }),
+      });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        showError(data.error || 'Sitemap assembly failed.');
+        return;
+      }
+      outputArea.value = data.sitemap || '';
+      copyBtn.disabled = !outputArea.value;
+      addHistoryEntry(pageUrlInput.value.trim(), { sitemap: data.sitemap });
+    } catch (err) {
+      showError('Network error during sitemap assembly. Try again.');
+    } finally {
+      setBtnLoading(generateSitemapBtn, false);
+    }
+  }
 
+  async function generateHero() {
+    clearError();
     var pageUrl = pageUrlInput.value.trim();
     var targetSelector = targetSelectorInput.value.trim();
     var targetHtml = targetHtmlInput.value;
-
     if (!pageUrl || !targetSelector || !targetHtml.trim()) {
-      showError('Detection output is incomplete. Detect hero or fill fields manually.');
+      showError('Detect or fill in the hero element first.');
       return;
     }
 
-    setBtnLoading(generateBtn, true);
+    setBtnLoading(generateHeroBtn, true);
     try {
       var response = await fetch('/generate', {
         method: 'POST',
@@ -197,43 +189,53 @@
           targetHtml: targetHtml,
           extractedStyles: extractedStyles,
           customerName: customerNameInput.value.trim(),
-          cardSelector: cardSelectorInput.value.trim(),
         }),
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
-        if (response.status === 502 || response.status === 503 || response.status === 504) {
-          showError(
-            'The AI service timed out \u2014 this can happen with large or complex '
-            + 'hero elements. Try again, or select a simpler parent element with '
-            + 'fewer nested containers if the problem persists.'
-          );
-        } else {
-          showError(data.error || 'Generation failed (' + response.status + ').');
-        }
+        if (response.status >= 502 && response.status <= 504) showError(TIMEOUT_MSG);
+        else showError(data.error || 'Hero generation failed (' + response.status + ').');
         return;
       }
-      if (!data.sitemap) {
-        showError('Sitemap generation returned empty output.');
+      if (!data.heroTemplate) {
+        showError('Hero generation returned empty output.');
         return;
       }
-      applyOutputs(data);
-      showFeedbackPanel();
-      addHistoryEntry(pageUrl, data);
+      heroTemplateOutput.value = data.heroTemplate;
+      copyHeroBtn.disabled = false;
+      heroFeedbackBtn.disabled = false;
+      addHistoryEntry(pageUrl, { heroTemplate: data.heroTemplate });
     } catch (err) {
-      showError(
-        err.name === 'TypeError'
-          ? 'The AI service timed out \u2014 this can happen with large or complex '
-            + 'hero elements. Try again, or select a simpler parent element with '
-            + 'fewer nested containers if the problem persists.'
-          : 'Network error during sitemap generation. Try again.'
-      );
+      showError(err.name === 'TypeError' ? TIMEOUT_MSG : 'Network error during hero generation. Try again.');
     } finally {
-      setBtnLoading(generateBtn, false);
+      setBtnLoading(generateHeroBtn, false);
     }
   }
 
-  async function regenerateWithFeedback() {
+  async function generateRecommendations() {
+    clearError();
+    setBtnLoading(generateRecBtn, true);
+    try {
+      var response = await fetch('/recommendations-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        showError(data.error || 'Recommendations template failed.');
+        return;
+      }
+      recTemplateOutput.value = data.recTemplate || '';
+      copyRecBtn.disabled = !recTemplateOutput.value;
+    } catch (err) {
+      showError('Network error during recommendations generation. Try again.');
+    } finally {
+      setBtnLoading(generateRecBtn, false);
+    }
+  }
+
+  async function regenerateHeroWithFeedback() {
     clearError();
     var issues = getCheckedIssues();
     var note = feedbackNote.value.trim();
@@ -254,43 +256,54 @@
           extractedStyles: extractedStyles,
           previousOutput: heroTemplateOutput.value,
           issues: issues,
-          feedbackNote: feedbackNote.value.trim(),
+          feedbackNote: note,
           customerName: customerNameInput.value.trim(),
-          cardSelector: cardSelectorInput.value.trim(),
         }),
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
-        if (response.status === 502 || response.status === 503 || response.status === 504) {
-          showError(
-            'The AI service timed out \u2014 this can happen with large or complex '
-            + 'hero elements. Try again, or select a simpler parent element with '
-            + 'fewer nested containers if the problem persists.'
-          );
-        } else {
-          showError(data.error || 'Regeneration failed (' + response.status + ').');
-        }
+        if (response.status >= 502 && response.status <= 504) showError(TIMEOUT_MSG);
+        else showError(data.error || 'Regeneration failed (' + response.status + ').');
         return;
       }
-      if (!data.sitemap) {
+      if (!data.heroTemplate) {
         showError('Regeneration returned empty output.');
         return;
       }
-      applyOutputs(data);
-      hideFeedbackPanel();
-      showFeedbackPanel();
-      addHistoryEntry(pageUrlInput.value.trim(), data);
+      heroTemplateOutput.value = data.heroTemplate;
+      copyHeroBtn.disabled = false;
+      addHistoryEntry(pageUrlInput.value.trim(), { heroTemplate: data.heroTemplate });
+      closeFeedbackModal();
     } catch (err) {
-      showError(
-        err.name === 'TypeError'
-          ? 'The AI service timed out \u2014 this can happen with large or complex '
-            + 'hero elements. Try again, or select a simpler parent element with '
-            + 'fewer nested containers if the problem persists.'
-          : 'Network error during regeneration. Try again.'
-      );
+      showError(err.name === 'TypeError' ? TIMEOUT_MSG : 'Network error during regeneration. Try again.');
     } finally {
       setBtnLoading(regenerateBtn, false);
     }
+  }
+
+  function getCheckedIssues() {
+    var issues = [];
+    issueCheckboxes.forEach(function (cb) { if (cb.checked) issues.push(cb.value); });
+    return issues;
+  }
+
+  function updateRegenerateEnabled() {
+    regenerateBtn.disabled = getCheckedIssues().length === 0 && !feedbackNote.value.trim();
+  }
+
+  function openFeedbackModal() {
+    if (!heroTemplateOutput.value) return;
+    feedbackModal.hidden = false;
+    document.body.classList.add('modal-open');
+    updateRegenerateEnabled();
+  }
+
+  function closeFeedbackModal() {
+    feedbackModal.hidden = true;
+    document.body.classList.remove('modal-open');
+    feedbackNote.value = '';
+    issueCheckboxes.forEach(function (cb) { cb.checked = false; });
+    regenerateBtn.disabled = true;
   }
 
   pageUrlInput.addEventListener('blur', function () {
@@ -300,19 +313,25 @@
   });
 
   detectBtn.addEventListener('click', detectHero);
-  generateBtn.addEventListener('click', generateSitemap);
-  regenerateBtn.addEventListener('click', regenerateWithFeedback);
+  generateSitemapBtn.addEventListener('click', generateSitemap);
+  generateHeroBtn.addEventListener('click', generateHero);
+  generateRecBtn.addEventListener('click', generateRecommendations);
+  heroFeedbackBtn.addEventListener('click', openFeedbackModal);
+  regenerateBtn.addEventListener('click', regenerateHeroWithFeedback);
 
-  issueCheckboxes.forEach(function (cb) {
-    cb.addEventListener('change', updateRegenerateEnabled);
+  feedbackModal.addEventListener('click', function (e) {
+    if (e.target.hasAttribute('data-close-modal')) closeFeedbackModal();
   });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !feedbackModal.hidden) closeFeedbackModal();
+  });
+
+  issueCheckboxes.forEach(function (cb) { cb.addEventListener('change', updateRegenerateEnabled); });
   feedbackNote.addEventListener('input', updateRegenerateEnabled);
 
-  manualToggle.addEventListener('change', function () {
-    setEditable(this.checked);
-  });
-  targetSelectorInput.addEventListener('input', updateGenerateEnabled);
-  targetHtmlInput.addEventListener('input', updateGenerateEnabled);
+  manualToggle.addEventListener('change', function () { setEditable(this.checked); });
+  targetSelectorInput.addEventListener('input', refreshSectionButtons);
+  targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
   function wireCopyButton(btn, source) {
     btn.addEventListener('click', async function () {
@@ -333,7 +352,7 @@
   }
   wireCopyButton(copyBtn, outputArea);
   wireCopyButton(copyHeroBtn, heroTemplateOutput);
-  wireCopyButton(copyCardBtn, cardTemplateOutput);
+  wireCopyButton(copyRecBtn, recTemplateOutput);
 
   function deriveBrand(url) {
     try {
@@ -354,16 +373,16 @@
     localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, HISTORY_MAX)));
   }
 
-  function addHistoryEntry(url, data) {
+  function addHistoryEntry(url, partial) {
     var entries = getHistory();
     entries.unshift({
       id: String(Date.now()),
       brand: deriveBrand(url),
       url: url,
       timestamp: Date.now(),
-      sitemap: data.sitemap || '',
-      heroTemplate: data.heroTemplate || '',
-      cardTemplate: data.cardTemplate || '',
+      sitemap: partial.sitemap || '',
+      heroTemplate: partial.heroTemplate || '',
+      recTemplate: partial.recTemplate || '',
     });
     saveHistory(entries);
     renderHistory();
@@ -388,7 +407,7 @@
     clearHistoryBtn.hidden = entries.length === 0;
 
     if (entries.length === 0) {
-      historyList.innerHTML = '<p class="history-empty">No sitemaps generated yet.</p>';
+      historyList.innerHTML = '<p class="history-empty">No artifacts generated yet.</p>';
       return;
     }
 
@@ -417,12 +436,13 @@
     if (!entry) return;
 
     if (btn.classList.contains('history-btn--load')) {
-      applyOutputs({
-        sitemap: entry.sitemap,
-        heroTemplate: entry.heroTemplate || '',
-        cardTemplate: entry.cardTemplate || '',
-      });
-      showFeedbackPanel();
+      if (entry.sitemap) { outputArea.value = entry.sitemap; copyBtn.disabled = false; }
+      if (entry.heroTemplate) {
+        heroTemplateOutput.value = entry.heroTemplate;
+        copyHeroBtn.disabled = false;
+        heroFeedbackBtn.disabled = false;
+      }
+      if (entry.recTemplate) { recTemplateOutput.value = entry.recTemplate; copyRecBtn.disabled = false; }
       outputArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (btn.classList.contains('history-btn--delete')) {
       deleteHistoryEntry(id);

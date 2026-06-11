@@ -767,6 +767,24 @@ def extract_styles():
     return jsonify(extractedStyles=extracted)
 
 
+@app.route("/assemble-sitemap", methods=["POST"])
+def assemble_sitemap_endpoint():
+    data = request.get_json(silent=True) or {}
+    hero_selector = (data.get("heroSelector") or "").strip()
+    rec_selector = (data.get("recSelector") or "").strip()
+
+    if not hero_selector:
+        return jsonify(error="heroSelector is required."), 400
+
+    sitemap_js = assemble_sitemap_v2(hero_selector, rec_selector)
+    return jsonify(sitemap=sitemap_js)
+
+
+@app.route("/recommendations-template", methods=["POST"])
+def recommendations_template_endpoint():
+    return jsonify(recTemplate=CARD_EXPERIENCE_TEMPLATE_HTML)
+
+
 @app.route("/generate", methods=["POST"])
 def generate():
     data = request.get_json(silent=True) or {}
@@ -813,14 +831,7 @@ def generate():
     hero_html = strip_markdown_fences(hero_html)
     hero_html = inline_extracted_styles(hero_html, extracted_styles)
 
-    card_selector = (data.get("cardSelector") or "").strip()
-    sitemap_js = assemble_sitemap_v2(target_selector, card_selector)
-
-    return jsonify(
-        sitemap=sitemap_js,
-        heroTemplate=hero_html,
-        cardTemplate=CARD_EXPERIENCE_TEMPLATE_HTML,
-    )
+    return jsonify(heroTemplate=hero_html)
 
 
 def _llm_error_message(err):
@@ -926,14 +937,7 @@ def regenerate():
     corrected_html = strip_markdown_fences(corrected_html)
     corrected_html = inline_extracted_styles(corrected_html, extracted_styles)
 
-    card_selector = (data.get("cardSelector") or "").strip()
-    sitemap_js = assemble_sitemap_v2(target_selector, card_selector)
-
-    return jsonify(
-        sitemap=sitemap_js,
-        heroTemplate=corrected_html,
-        cardTemplate=CARD_EXPERIENCE_TEMPLATE_HTML,
-    )
+    return jsonify(heroTemplate=corrected_html)
 
 
 if __name__ == "__main__":
