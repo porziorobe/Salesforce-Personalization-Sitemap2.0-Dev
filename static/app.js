@@ -46,7 +46,7 @@
   var artifacts = {
     sitemap: { value: '', state: 'empty', label: '1. Sitemap JS' },
     hero: { value: '', state: 'empty', label: '2. Hero Experience Template' },
-    rec: { value: '', state: 'empty', label: '3. Recommendations Experience Template' },
+    rec: { value: '', state: 'empty', label: '3. Recs Experience Template' },
   };
 
   var openButtons = { sitemap: openSitemapBtn, hero: openHeroBtn, rec: openRecBtn };

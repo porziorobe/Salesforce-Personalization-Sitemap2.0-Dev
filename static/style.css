@@ -45,6 +45,7 @@ body { margin: 0; min-height: 100vh; font-family: var(--font-stack); color: var(
 .btn-primary:hover:not(:disabled) { background: var(--sf-blue-hover); border-color: var(--sf-blue-hover); }
 .btn-neutral { background: var(--sf-surface); color: var(--sf-blue); border-color: var(--sf-border-strong); }
 .btn-loading[hidden] { display: none; }
+.btn[hidden] { display: none; }
 .btn.is-loading .btn-label { display: none; }
 .btn.is-loading .btn-loading { display: inline !important; }
 .status-chip { display: inline-flex; align-items: center; font-size: 0.75rem; font-weight: 600; color: var(--sf-blue-dark); background: #eaf5fe; border: 1px solid #bdd9f8; border-radius: 999px; padding: 0.25rem 0.6rem; }
@@ -116,9 +117,9 @@ body.modal-open { overflow: hidden; }
 
 .status-chip[hidden] { display: none; }
 
-.artifact-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.875rem 0; border-top: 1px solid #e5e5e5; flex-wrap: wrap; }
+.artifact-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0.625rem; padding: 0.875rem 0; border-top: 1px solid #e5e5e5; }
 .artifact-row:first-of-type { border-top: 0; padding-top: 0.5rem; }
-.artifact-info { display: flex; align-items: center; gap: 0.625rem; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+.artifact-info { display: flex; align-items: center; gap: 0.625rem; min-width: 0; flex-wrap: wrap; }
 .artifact-name { font-weight: 600; color: #181818; font-size: 0.95rem; }
 .artifact-hint { color: #706e6b; font-size: 0.8rem; }
 .artifact-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -141,6 +142,5 @@ body.modal-open { overflow: hidden; }
 .modal-tab-panel[hidden] { display: none; }
 
 @media (max-width: 720px) {
-  .artifact-row { flex-direction: column; align-items: flex-start; }
   .artifact-actions { width: 100%; }
 }
