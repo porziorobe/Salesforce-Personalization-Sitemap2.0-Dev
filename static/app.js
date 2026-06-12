@@ -5,7 +5,6 @@
   var detectedFields = document.getElementById('detected-fields');
   var targetSelectorInput = document.getElementById('target-selector');
   var targetHtmlInput = document.getElementById('target-html');
-  var manualToggle = document.getElementById('manual-toggle');
   var recContainerSelectorInput = document.getElementById('rec-container-selector');
   var recCardSelectorInput = document.getElementById('rec-card-selector');
   var recHtmlInput = document.getElementById('rec-html');
@@ -81,11 +80,6 @@
   function clearError() {
     errorBanner.textContent = '';
     errorBanner.hidden = true;
-  }
-
-  function setEditable(editable) {
-    targetSelectorInput.readOnly = !editable;
-    targetHtmlInput.readOnly = !editable;
   }
 
 function setRecStatus(message) {
@@ -214,8 +208,6 @@ function setRecStatus(message) {
       if (!response.ok) {
         showError('Could not access this site automatically. Enter the CSS selector and element HTML below.');
         detectedFields.hidden = false;
-        manualToggle.checked = true;
-        setEditable(true);
         applyRecsResult(null);
         refreshSectionButtons();
         return;
@@ -224,8 +216,6 @@ function setRecStatus(message) {
       targetSelectorInput.value = data.selector || '';
       targetHtmlInput.value = data.outerHtml || '';
       detectedFields.hidden = false;
-      manualToggle.checked = false;
-      setEditable(false);
 
       applyRecsResult(data.recs);
 
@@ -242,8 +232,6 @@ function setRecStatus(message) {
     } catch (err) {
       showError('Could not access this site automatically. Enter the CSS selector and element HTML below.');
       detectedFields.hidden = false;
-      manualToggle.checked = true;
-      setEditable(true);
       applyRecsResult(null);
       refreshSectionButtons();
     } finally {
@@ -620,7 +608,6 @@ function setRecStatus(message) {
   recIssueCheckboxes.forEach(function (cb) { cb.addEventListener('change', updateRegenerateEnabled); });
   feedbackNote.addEventListener('input', updateRegenerateEnabled);
 
-  manualToggle.addEventListener('change', function () { setEditable(this.checked); });
   targetSelectorInput.addEventListener('input', refreshSectionButtons);
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
