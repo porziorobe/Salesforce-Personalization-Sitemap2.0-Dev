@@ -36,6 +36,7 @@ BROWSER_UA = (
 )
 
 HERO_KEYWORDS = re.compile(r"(hero|banner|jumbotron|masthead|splash|jumbo)", re.I)
+RECS_KEYWORDS = re.compile(r"(recommend|product|card|grid|carousel|featured|related|tile|collection)", re.I)
 
 DEFAULT_STYLES = {
     "banner": {"backgroundColor": "#333333", "fontFamily": "Arial, Helvetica, sans-serif"},
@@ -47,6 +48,19 @@ DEFAULT_STYLES = {
         "padding": "10px 20px",
         "color": "#DDDDDD",
     },
+}
+
+DEFAULT_RECS_STYLES = {
+    "card": {
+        "backgroundColor": "#ffffff",
+        "borderRadius": "12px",
+        "boxShadow": "0 2px 12px rgba(0,0,0,0.10)",
+        "padding": "20px",
+    },
+    "card_image": {"borderRadius": "8px", "aspectRatio": "auto"},
+    "card_title": {"fontSize": "18px", "fontWeight": "600", "color": "#1d1d1d"},
+    "card_text": {"fontSize": "14px", "color": "#555555"},
+    "card_link": {"color": "#097fb3", "textDecoration": "none", "fontWeight": "500"},
 }
 
 SITEMAP_TEMPLATE_V2 = r"""//SimpleSitemap (Experience Template model)
@@ -490,6 +504,136 @@ RULES:
 Output ONLY the corrected HTML. No JavaScript, no boilerplate, no markdown fences, no commentary."""
 
 
+RECS_LLM_PROMPT = """You are an expert at adapting website HTML into Salesforce Personalization Handlebars transformer card templates.
+
+You will receive two inputs:
+1. CARD_HTML - The cleaned HTML of one product/recommendation card from the customer's site
+2. EXTRACTED_STYLES - Fallback CSS values extracted from the customer's card
+
+=== TASK ===
+
+Adapt CARD_HTML into a Handlebars template for ONE card. The output will be looped
+externally via {{{{#each (subVar 'recs')}}}} - you do NOT write the loop, the wrapper
+container, or any <style> block. Output the per-card body only.
+
+Rules:
+
+1. PRESERVE THE CUSTOMER'S CARD STRUCTURE.
+   Keep the tag hierarchy, nesting, wrapper divs, and CSS class names from CARD_HTML.
+   The customer's existing stylesheets will style these class names on the live page.
+   Do NOT flatten the hierarchy. Do NOT invent generic class names.
+
+2. SLOT THE 3 MANDATORY subVar VARIABLES:
+   - {{{{subVar 'image'}}}} - src of the card's product image
+   - {{{{subVar 'name'}}}} - text content of the card's title/heading
+   - {{{{subVar 'linkUrl'}}}} - href of the card's link
+   Wrap the image in {{{{#if (subVar 'image')}}}}...{{{{else}}}}<placeholder fallback>{{{{/if}}}}.
+
+3. OPTIONAL subVar VARIABLES (include only if CARD_HTML clearly has these):
+   - {{{{subVar 'price'}}}} - price text
+   - {{{{subVar 'description'}}}} - short description text
+
+4. STRIP REMAINING NOISE.
+   Remove video, audio, modal, script, button-as-popup, and interactive elements
+   not part of the card's link. Remove empty wrapper divs.
+
+5. INLINE STYLES - use sparingly.
+   Keep inline styles already in CARD_HTML. Add inline styles only where essential
+   (e.g. ensuring the image renders at consistent size). Do NOT add a <style> block.
+   If you add fallback styles, use EXTRACTED_STYLES values as inline style attributes.
+
+=== INPUTS ===
+- CARD_HTML:
+{card_html}
+- EXTRACTED_STYLES:
+{extracted_styles}
+
+=== OUTPUT ===
+Output ONLY the per-card HTML body. No <style> block, no {{{{#each}}}} wrapper, no
+outer container, no JavaScript, no boilerplate, no markdown fences, no commentary."""
+
+
+RECS_ISSUE_INSTRUCTIONS = {
+    "image_missing": (
+        "CARD IMAGE: Ensure {{subVar 'image'}} is used as the src of the card's image, "
+        "wrapped in {{#if (subVar 'image')}}...{{else}}<placeholder>{{/if}}."
+    ),
+    "title_wrong": (
+        "CARD TITLE: Ensure {{subVar 'name'}} is the text content of the card's heading "
+        "element. Preserve the customer's class names on the heading."
+    ),
+    "link_broken": (
+        "CARD LINK: Ensure the card's anchor uses href=\"{{subVar 'linkUrl'}}\". "
+        "Preserve the customer's link styling."
+    ),
+    "layout_wrong": (
+        "LAYOUT: The card structure should more closely mirror CARD_HTML. Preserve the "
+        "customer's wrapper divs, class names, and nesting."
+    ),
+}
+
+
+RECS_CORRECTION_PROMPT = """You are revising a Salesforce Personalization Handlebars per-card template.
+The user has flagged specific issues.
+
+RULES:
+- Fix ONLY the per-card body. Do NOT add a {{#each}} wrapper or outer container.
+- The 3 mandatory subVar variables (image, name, linkUrl) remain MANDATORY.
+- Preserve the customer's DOM structure and class names from CARD_HTML.
+- Do NOT add a <style> block. Use inline styles only where CARD_HTML already has them
+  or where essential.
+- Output ONLY the corrected per-card HTML body. No JavaScript, no boilerplate, no
+  markdown fences, no commentary.
+
+=== ISSUES TO FIX ===
+{issue_list}
+
+{user_note}
+
+=== ORIGINAL INPUTS ===
+- CARD_HTML:
+{card_html}
+- EXTRACTED_STYLES:
+{extracted_styles}
+
+=== YOUR PREVIOUS PER-CARD HTML ===
+{previous_html}
+
+=== OUTPUT ===
+Output ONLY the corrected per-card HTML body. No JavaScript, no boilerplate, no markdown fences, no commentary."""
+
+
+RECS_TEMPLATE_WRAPPER = """<style>
+    .sfdcep-recs-carousel {{
+        width: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-evenly;
+        padding: 20px 0;
+        gap: 20px;
+    }}
+    .sfdcep-recs-card-wrapper {{
+        width: 22%;
+        min-width: 240px;
+        flex: 1 1 240px;
+    }}
+</style>
+<div class="sfdcep-recs-carousel">
+    {{{{#each (subVar 'recs')}}}}
+    <div class="sfdcep-recs-card-wrapper">
+{card_body}
+    </div>
+    {{{{/each}}}}
+</div>"""
+
+
+def wrap_recs_card(card_body):
+    """Wrap an LLM-generated per-card body in the deterministic grid template."""
+    return RECS_TEMPLATE_WRAPPER.format(card_body=card_body)
+
+
 def fetch_page(url):
     resp = requests.get(url, headers={"User-Agent": BROWSER_UA, "Accept": "text/html"}, timeout=25, allow_redirects=True)
     resp.raise_for_status()
@@ -525,6 +669,74 @@ def detect_hero(soup):
     first_section = soup.find("section")
     if first_section:
         return first_section
+
+    return None
+
+
+def _structural_signature(el):
+    """Lightweight fingerprint — tag + sorted class set — used to spot repeating siblings."""
+    classes = tuple(sorted(el.get("class", [])))
+    return (el.name, classes)
+
+
+def _card_has_content(child):
+    """A plausible card has an image and a link or heading."""
+    has_img = child.find("img") is not None
+    has_link_or_heading = child.find("a") is not None or child.find(["h2", "h3", "h4"]) is not None
+    return has_img and has_link_or_heading
+
+
+def _score_repeating_container(container):
+    """Return (best_card_signature, sample_card) if container has >=3 similar cardlike children."""
+    children = [c for c in container.find_all(True, recursive=False) if c.name]
+    if len(children) < 3:
+        return None
+
+    sig_groups = {}
+    for child in children:
+        sig = _structural_signature(child)
+        sig_groups.setdefault(sig, []).append(child)
+
+    for sig, group in sig_groups.items():
+        if len(group) >= 3 and all(_card_has_content(c) for c in group[:3]):
+            return sig, group[0]
+    return None
+
+
+def detect_recs(soup):
+    """
+    Find a repeating product/card grid. Returns dict with container_selector,
+    card_selector, exemplar_html — or None if nothing scores.
+    """
+    if not soup.body:
+        return None
+
+    containers = soup.body.find_all(["ul", "ol", "div", "section"], limit=200)
+
+    # Pass 1: structural signal — 3+ similar children with img + link/heading.
+    for container in containers:
+        result = _score_repeating_container(container)
+        if result:
+            _sig, exemplar = result
+            return {
+                "containerSelector": best_selector(container),
+                "cardSelector": best_selector(exemplar),
+                "exemplarOuterHtml": str(exemplar),
+            }
+
+    # Pass 2: keyword + image structure.
+    for container in containers:
+        cls_id = " ".join(container.get("class", [])) + " " + (container.get("id") or "")
+        if not RECS_KEYWORDS.search(cls_id):
+            continue
+        children = [c for c in container.find_all(True, recursive=False) if c.name]
+        with_img = [c for c in children if c.find("img")]
+        if len(with_img) >= 3:
+            return {
+                "containerSelector": best_selector(container),
+                "cardSelector": best_selector(with_img[0]),
+                "exemplarOuterHtml": str(with_img[0]),
+            }
 
     return None
 
@@ -569,6 +781,19 @@ def infer_bucket(selector_text, declarations):
     if "h2" in s or "subheader" in s or "subtitle" in s or " p" in s:
         return "subheader"
     return "banner"
+
+
+def infer_bucket_card(selector_text, declarations):
+    s = selector_text.lower()
+    if "img" in s or ".image" in s or ".thumb" in s:
+        return "card_image"
+    if "h2" in s or "h3" in s or "h4" in s or "title" in s or "name" in s:
+        return "card_title"
+    if " a" in s or s.endswith("a") or ".link" in s or ".cta" in s or ".btn" in s:
+        return "card_link"
+    if " p" in s or ".price" in s or ".desc" in s or ".body" in s or ".text" in s:
+        return "card_text"
+    return "card"
 
 
 NOISE_TAGS = {
@@ -645,6 +870,44 @@ def pick_style_values(base, declarations, bucket):
             base["cta"]["color"] = declarations["color"]
 
 
+def pick_recs_style_values(base, declarations, bucket):
+    if bucket == "card":
+        if "background-color" in declarations and _usable(declarations["background-color"]):
+            base["card"]["backgroundColor"] = declarations["background-color"]
+        elif "background" in declarations and _usable(declarations["background"]):
+            base["card"]["backgroundColor"] = declarations["background"]
+        if "border-radius" in declarations and _usable(declarations["border-radius"]):
+            base["card"]["borderRadius"] = declarations["border-radius"]
+        if "box-shadow" in declarations and _usable(declarations["box-shadow"]):
+            base["card"]["boxShadow"] = declarations["box-shadow"]
+        if "padding" in declarations and _usable(declarations["padding"]):
+            base["card"]["padding"] = declarations["padding"]
+    elif bucket == "card_image":
+        if "border-radius" in declarations and _usable(declarations["border-radius"]):
+            base["card_image"]["borderRadius"] = declarations["border-radius"]
+        if "aspect-ratio" in declarations and _usable(declarations["aspect-ratio"]):
+            base["card_image"]["aspectRatio"] = declarations["aspect-ratio"]
+    elif bucket == "card_title":
+        if "color" in declarations and _usable(declarations["color"]):
+            base["card_title"]["color"] = declarations["color"]
+        if "font-size" in declarations and _usable(declarations["font-size"]):
+            base["card_title"]["fontSize"] = declarations["font-size"]
+        if "font-weight" in declarations and _usable(declarations["font-weight"]):
+            base["card_title"]["fontWeight"] = declarations["font-weight"]
+    elif bucket == "card_text":
+        if "color" in declarations and _usable(declarations["color"]):
+            base["card_text"]["color"] = declarations["color"]
+        if "font-size" in declarations and _usable(declarations["font-size"]):
+            base["card_text"]["fontSize"] = declarations["font-size"]
+    elif bucket == "card_link":
+        if "color" in declarations and _usable(declarations["color"]):
+            base["card_link"]["color"] = declarations["color"]
+        if "text-decoration" in declarations and _usable(declarations["text-decoration"]):
+            base["card_link"]["textDecoration"] = declarations["text-decoration"]
+        if "font-weight" in declarations and _usable(declarations["font-weight"]):
+            base["card_link"]["fontWeight"] = declarations["font-weight"]
+
+
 def extract_matching_rules(css_text, hero_classes):
     try:
         sheet = cssutils.parseString(css_text, validate=False)
@@ -697,11 +960,23 @@ def detect():
     if not hero:
         return jsonify(error="Could not detect a hero element on this page."), 404
 
+    recs = detect_recs(soup)
+
     return jsonify(
         pageUrl=final_url,
         selector=best_selector(hero),
         outerHtml=str(hero),
+        recs=recs,
     )
+
+
+def _resolve_selector(soup, selector):
+    if selector.startswith("#"):
+        return soup.find(id=selector[1:])
+    if selector.startswith("."):
+        parts = selector[1:].split(".")
+        return soup.find(class_=lambda c: c and all(p in c.split() for p in parts))
+    return soup.select_one(selector)
 
 
 @app.route("/extract-styles", methods=["POST"])
@@ -709,6 +984,7 @@ def extract_styles():
     data = request.get_json(silent=True) or {}
     page_url = (data.get("pageUrl") or "").strip()
     target_selector = (data.get("targetSelector") or "").strip()
+    mode = (data.get("mode") or "hero").strip().lower()
 
     if not page_url:
         return jsonify(error="pageUrl is required."), 400
@@ -721,17 +997,44 @@ def extract_styles():
         return jsonify(error=f"Failed to fetch page: {e}"), 502
 
     soup = BeautifulSoup(html, "html.parser")
+    target = _resolve_selector(soup, target_selector)
 
-    if target_selector.startswith("#"):
-        hero = soup.find(id=target_selector[1:])
-    elif target_selector.startswith("."):
-        parts = target_selector[1:].split(".")
-        hero = soup.find(class_=lambda c: c and all(p in c.split() for p in parts))
-    else:
-        hero = soup.select_one(target_selector)
+    if mode == "recs":
+        if not target:
+            return jsonify(extractedStyles=json.loads(json.dumps(DEFAULT_RECS_STYLES)))
 
-    if not hero:
-        hero = detect_hero(soup)
+        extracted = json.loads(json.dumps(DEFAULT_RECS_STYLES))
+        target_classes = collect_hero_classes(target)
+
+        inline = parse_inline_style(target.get("style", ""))
+        pick_recs_style_values(extracted, inline, "card")
+        for child in target.find_all(True, recursive=False):
+            child_inline = parse_inline_style(child.get("style", ""))
+            bucket = infer_bucket_card(child.name or "", child_inline)
+            pick_recs_style_values(extracted, child_inline, bucket)
+
+        for style_tag in soup.find_all("style"):
+            css_text = style_tag.string or ""
+            for sel, declarations in extract_matching_rules(css_text, target_classes):
+                pick_recs_style_values(extracted, declarations, infer_bucket_card(sel, declarations))
+
+        for link in soup.find_all("link", rel="stylesheet"):
+            href = link.get("href")
+            if not href:
+                continue
+            try:
+                abs_url = urljoin(final_url, href)
+                resp = requests.get(abs_url, headers={"User-Agent": BROWSER_UA}, timeout=15)
+                if resp.status_code == 200:
+                    for sel, declarations in extract_matching_rules(resp.text, target_classes):
+                        pick_recs_style_values(extracted, declarations, infer_bucket_card(sel, declarations))
+            except Exception:
+                continue
+
+        return jsonify(extractedStyles=extracted)
+
+    # hero mode (default, unchanged behavior)
+    hero = target or detect_hero(soup)
 
     extracted = json.loads(json.dumps(DEFAULT_STYLES))
 
@@ -938,6 +1241,111 @@ def regenerate():
     corrected_html = inline_extracted_styles(corrected_html, extracted_styles)
 
     return jsonify(heroTemplate=corrected_html)
+
+
+@app.route("/generate-recs", methods=["POST"])
+def generate_recs():
+    data = request.get_json(silent=True) or {}
+    page_url = (data.get("pageUrl") or "").strip()
+    card_html = data.get("cardHtml") or ""
+    card_selector = (data.get("cardSelector") or "").strip()
+    extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
+
+    if not page_url:
+        return jsonify(error="pageUrl is required."), 400
+    if not card_html.strip():
+        return jsonify(error="cardHtml is required."), 400
+    if not card_selector:
+        return jsonify(error="cardSelector is required."), 400
+
+    try:
+        clean_html = sanitize_html(card_html)
+    except Exception:
+        clean_html = card_html
+
+    prompt = RECS_LLM_PROMPT.format(
+        card_html=clean_html,
+        extracted_styles=json.dumps(extracted_styles, indent=2),
+    )
+
+    last_err = None
+    result = None
+    for attempt in range(3):
+        try:
+            result = llm.invoke(prompt)
+            break
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    if result is None:
+        return jsonify(error=_llm_error_message(last_err)), 502
+
+    card_body = result if isinstance(result, str) else str(result)
+    card_body = strip_markdown_fences(card_body)
+    card_body = inline_extracted_styles(card_body, extracted_styles)
+
+    full_template = wrap_recs_card(card_body)
+    return jsonify(recsTemplate=full_template, cardBody=card_body)
+
+
+@app.route("/regenerate-recs", methods=["POST"])
+def regenerate_recs():
+    data = request.get_json(silent=True) or {}
+    card_html = data.get("cardHtml") or ""
+    extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
+    previous_card_body = data.get("previousCardBody") or ""
+    issues = data.get("issues") or []
+    feedback_note = (data.get("feedbackNote") or "").strip()
+
+    if not previous_card_body.strip():
+        return jsonify(error="previousCardBody is required."), 400
+
+    issue_lines = []
+    for key in issues:
+        instruction = RECS_ISSUE_INSTRUCTIONS.get(key)
+        if instruction:
+            issue_lines.append(f"- {instruction}")
+
+    if not issue_lines and not feedback_note:
+        return jsonify(error="Select an issue or provide feedback text."), 400
+
+    user_note_section = ""
+    if feedback_note:
+        user_note_section = f"=== ADDITIONAL USER FEEDBACK ===\n{feedback_note}"
+
+    try:
+        clean_html = sanitize_html(card_html)
+    except Exception:
+        clean_html = card_html
+
+    prompt = RECS_CORRECTION_PROMPT.format(
+        issue_list="\n".join(issue_lines),
+        user_note=user_note_section,
+        card_html=clean_html,
+        extracted_styles=json.dumps(extracted_styles, indent=2),
+        previous_html=previous_card_body.strip(),
+    )
+
+    last_err = None
+    result = None
+    for attempt in range(3):
+        try:
+            result = llm.invoke(prompt)
+            break
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    if result is None:
+        return jsonify(error=_llm_error_message(last_err)), 502
+
+    card_body = result if isinstance(result, str) else str(result)
+    card_body = strip_markdown_fences(card_body)
+    card_body = inline_extracted_styles(card_body, extracted_styles)
+
+    full_template = wrap_recs_card(card_body)
+    return jsonify(recsTemplate=full_template, cardBody=card_body)
 
 
 if __name__ == "__main__":

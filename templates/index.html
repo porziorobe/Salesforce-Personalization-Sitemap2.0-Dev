@@ -43,7 +43,7 @@
             </div>
             <div class="actions">
               <button type="button" id="detect-btn" class="btn btn-primary">
-                <span class="btn-label">Detect Hero Element</span>
+                <span class="btn-label">Detect Page Elements</span>
                 <span class="btn-loading" hidden aria-hidden="true">Detecting...</span>
               </button>
               <span id="extracting-indicator" class="status-chip" hidden>Extracting styles...</span>
@@ -66,18 +66,22 @@
                 </label>
               </div>
 
-              <h3 class="subsection-heading">Recs <span class="coming-soon">Coming soon! A working but unbranded placeholder will be generated.</span></h3>
+              <h3 class="subsection-heading">Recs <span id="rec-status-note" class="coming-soon" hidden></span></h3>
               <div class="field">
-                <label class="label" for="rec-selector">CSS Selector</label>
-                <input id="rec-selector" type="text" class="input" disabled placeholder="Auto-detected in a future release" />
+                <label class="label" for="rec-container-selector">Container Selector</label>
+                <input id="rec-container-selector" type="text" class="input" readonly placeholder="Detect to auto-populate, or fill manually" />
               </div>
               <div class="field">
-                <label class="label" for="rec-html">Element HTML</label>
-                <textarea id="rec-html" class="textarea textarea-tall" rows="6" disabled placeholder="Auto-detected in a future release"></textarea>
+                <label class="label" for="rec-card-selector">Card Selector</label>
+                <input id="rec-card-selector" type="text" class="input" readonly placeholder="Detect to auto-populate, or fill manually" />
+              </div>
+              <div class="field">
+                <label class="label" for="rec-html">Exemplar Card HTML</label>
+                <textarea id="rec-html" class="textarea textarea-tall" rows="6" readonly placeholder="The first detected card's HTML — used as the LLM template source"></textarea>
               </div>
               <div class="toggle-row">
-                <label class="toggle-label toggle-disabled" for="rec-manual-toggle">
-                  <input type="checkbox" id="rec-manual-toggle" disabled />
+                <label class="toggle-label" for="rec-manual-toggle">
+                  <input type="checkbox" id="rec-manual-toggle" />
                   Looks wrong? Edit manually
                 </label>
               </div>
@@ -136,7 +140,7 @@
               </span>
             </div>
             <div class="artifact-actions">
-              <button type="button" id="generate-rec-btn" class="btn btn-primary">
+              <button type="button" id="generate-rec-btn" class="btn btn-primary" disabled>
                 <span class="btn-label">Generate</span>
                 <span class="btn-loading" hidden aria-hidden="true">Generating...</span>
               </button>
@@ -179,26 +183,29 @@
           </div>
           <div id="modal-tab-refine" class="modal-tab-panel" hidden>
             <p class="modal-intro">Select what's wrong and re-run the LLM with corrections.</p>
-            <div class="feedback-checks">
+            <div id="hero-feedback-checks" class="feedback-checks">
               <label class="check-label"><input type="checkbox" name="fb-issue" value="background_image" /> Background image not showing</label>
               <label class="check-label"><input type="checkbox" name="fb-issue" value="text_content" /> Header or subheader wrong</label>
               <label class="check-label"><input type="checkbox" name="fb-issue" value="cta_missing" /> CTA button missing or wrong</label>
               <label class="check-label"><input type="checkbox" name="fb-issue" value="layout_wrong" /> Layout doesn't match original</label>
+            </div>
+            <div id="rec-feedback-checks" class="feedback-checks" hidden>
+              <label class="check-label"><input type="checkbox" name="fb-rec-issue" value="image_missing" /> Card image not showing</label>
+              <label class="check-label"><input type="checkbox" name="fb-rec-issue" value="title_wrong" /> Card title wrong</label>
+              <label class="check-label"><input type="checkbox" name="fb-rec-issue" value="link_broken" /> Card link broken</label>
+              <label class="check-label"><input type="checkbox" name="fb-rec-issue" value="layout_wrong" /> Layout doesn't match cards on site</label>
             </div>
             <div class="field">
               <label class="label" for="feedback-note">Additional details (optional)</label>
               <textarea id="feedback-note" class="textarea" rows="3" placeholder="e.g. The CTA should be centered below the subheader..."></textarea>
             </div>
           </div>
-          <div id="modal-tab-refine-soon" class="modal-tab-panel" hidden>
-            <p class="modal-intro">Refine for Recs is coming soon — once LLM generation lands, you'll be able to flag issues here and regenerate.</p>
-          </div>
         </div>
         <footer class="modal-footer">
           <button type="button" class="btn btn-neutral" data-close-modal>Close</button>
           <button type="button" id="modal-copy-btn" class="btn btn-neutral">Copy</button>
           <button type="button" id="regenerate-btn" class="btn btn-primary" hidden disabled>
-            <span class="btn-label">Regenerate Hero</span>
+            <span class="btn-label">Regenerate</span>
             <span class="btn-loading" hidden aria-hidden="true">Regenerating...</span>
           </button>
         </footer>

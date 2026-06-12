@@ -6,7 +6,11 @@
   var targetSelectorInput = document.getElementById('target-selector');
   var targetHtmlInput = document.getElementById('target-html');
   var manualToggle = document.getElementById('manual-toggle');
-  var recSelectorInput = document.getElementById('rec-selector');
+  var recContainerSelectorInput = document.getElementById('rec-container-selector');
+  var recCardSelectorInput = document.getElementById('rec-card-selector');
+  var recHtmlInput = document.getElementById('rec-html');
+  var recManualToggle = document.getElementById('rec-manual-toggle');
+  var recStatusNote = document.getElementById('rec-status-note');
 
   var generateSitemapBtn = document.getElementById('generate-sitemap-btn');
   var generateHeroBtn = document.getElementById('generate-hero-btn');
@@ -26,12 +30,14 @@
   var modalTabButtons = modal.querySelectorAll('.modal-tab');
   var modalCodePanel = document.getElementById('modal-tab-code');
   var modalRefinePanel = document.getElementById('modal-tab-refine');
-  var modalRefineSoonPanel = document.getElementById('modal-tab-refine-soon');
   var modalCode = document.getElementById('modal-code');
   var modalCopyBtn = document.getElementById('modal-copy-btn');
   var feedbackNote = document.getElementById('feedback-note');
   var regenerateBtn = document.getElementById('regenerate-btn');
-  var issueCheckboxes = document.querySelectorAll('input[name="fb-issue"]');
+  var heroFeedbackChecks = document.getElementById('hero-feedback-checks');
+  var recFeedbackChecks = document.getElementById('rec-feedback-checks');
+  var heroIssueCheckboxes = document.querySelectorAll('input[name="fb-issue"]');
+  var recIssueCheckboxes = document.querySelectorAll('input[name="fb-rec-issue"]');
 
   var errorBanner = document.getElementById('error-banner');
   var extractingIndicator = document.getElementById('extracting-indicator');
@@ -43,6 +49,9 @@
 
   var extractedStyles = null;
   var stylesReady = false;
+  var extractedRecsStyles = null;
+  var recsCardBody = '';
+  var recsAvailable = false;
 
   var artifacts = {
     sitemap: { value: '', state: 'empty', label: 'Sitemap JS' },
@@ -79,14 +88,43 @@
     targetHtmlInput.readOnly = !editable;
   }
 
+  function setRecEditable(editable) {
+    recContainerSelectorInput.readOnly = !editable;
+    recCardSelectorInput.readOnly = !editable;
+    recHtmlInput.readOnly = !editable;
+  }
+
+  function setRecStatus(message) {
+    if (!message) {
+      recStatusNote.hidden = true;
+      recStatusNote.textContent = '';
+      return;
+    }
+    recStatusNote.textContent = message;
+    recStatusNote.hidden = false;
+  }
+
   function heroInputsReady() {
     return targetSelectorInput.value.trim() && targetHtmlInput.value.trim();
+  }
+
+  function recsInputsReady() {
+    return recContainerSelectorInput.value.trim()
+      && recCardSelectorInput.value.trim()
+      && recHtmlInput.value.trim();
   }
 
   function refreshSectionButtons() {
     var ready = heroInputsReady();
     if (artifacts.sitemap.state !== 'generating') generateSitemapBtn.disabled = !ready;
     if (artifacts.hero.state !== 'generating') generateHeroBtn.disabled = !ready;
+    if (artifacts.rec.state !== 'generating') {
+      // Recs Generate is enabled either when LLM-ready (full inputs) or when the
+      // section is empty post-detect (clicks fall through to static placeholder).
+      var recsLLMReady = recsInputsReady();
+      var detectionRan = !detectedFields.hidden;
+      generateRecBtn.disabled = !(recsLLMReady || detectionRan);
+    }
   }
 
   var STATUS_LABELS = {
@@ -113,21 +151,55 @@
     copyButtons[key].disabled = !hasValue;
   }
 
-  async function extractStyles(pageUrl, targetSelector) {
+  async function extractStyles(pageUrl, targetSelector, mode) {
+    var response = await fetch('/extract-styles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pageUrl: pageUrl,
+        targetSelector: targetSelector,
+        mode: mode || 'hero',
+      }),
+    });
+    var data = await response.json().catch(function () { return {}; });
+    if (!response.ok) throw new Error(data.error || 'Style extraction failed.');
+    return data.extractedStyles || null;
+  }
+
+  async function extractHeroAndRecsStyles(pageUrl, heroSelector, recsCardSelector) {
     extractingIndicator.hidden = false;
     stylesReady = false;
     try {
-      var response = await fetch('/extract-styles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageUrl: pageUrl, targetSelector: targetSelector }),
-      });
-      var data = await response.json().catch(function () { return {}; });
-      if (!response.ok) throw new Error(data.error || 'Style extraction failed.');
-      extractedStyles = data.extractedStyles || null;
+      var heroPromise = extractStyles(pageUrl, heroSelector, 'hero');
+      var recsPromise = recsCardSelector
+        ? extractStyles(pageUrl, recsCardSelector, 'recs').catch(function () { return null; })
+        : Promise.resolve(null);
+      var results = await Promise.all([heroPromise, recsPromise]);
+      extractedStyles = results[0];
+      extractedRecsStyles = results[1];
       stylesReady = true;
     } finally {
       extractingIndicator.hidden = true;
+    }
+  }
+
+  function applyRecsResult(recs) {
+    if (recs && recs.containerSelector && recs.cardSelector) {
+      recContainerSelectorInput.value = recs.containerSelector;
+      recCardSelectorInput.value = recs.cardSelector;
+      recHtmlInput.value = recs.exemplarOuterHtml || '';
+      recManualToggle.checked = false;
+      setRecEditable(false);
+      recsAvailable = true;
+      setRecStatus('');
+    } else {
+      recContainerSelectorInput.value = '';
+      recCardSelectorInput.value = '';
+      recHtmlInput.value = '';
+      recManualToggle.checked = false;
+      setRecEditable(false);
+      recsAvailable = false;
+      setRecStatus('No recommendations section detected — branded LLM gen skipped. The static placeholder template is still available via Generate.');
     }
   }
 
@@ -152,6 +224,9 @@
         detectedFields.hidden = false;
         manualToggle.checked = true;
         setEditable(true);
+        applyRecsResult(null);
+        recManualToggle.checked = true;
+        setRecEditable(true);
         refreshSectionButtons();
         return;
       }
@@ -162,8 +237,14 @@
       manualToggle.checked = false;
       setEditable(false);
 
+      applyRecsResult(data.recs);
+
       try {
-        await extractStyles(pageUrl, targetSelectorInput.value.trim());
+        await extractHeroAndRecsStyles(
+          pageUrl,
+          targetSelectorInput.value.trim(),
+          recsAvailable ? recCardSelectorInput.value.trim() : null
+        );
       } catch (extractErr) {
         showError(extractErr.message || 'Style extraction failed.');
       }
@@ -173,6 +254,9 @@
       detectedFields.hidden = false;
       manualToggle.checked = true;
       setEditable(true);
+      applyRecsResult(null);
+      recManualToggle.checked = true;
+      setRecEditable(true);
       refreshSectionButtons();
     } finally {
       setBtnLoading(detectBtn, false);
@@ -193,7 +277,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           heroSelector: targetSelectorInput.value.trim(),
-          recSelector: recSelectorInput.value.trim(),
+          recSelector: recContainerSelectorInput.value.trim(),
         }),
       });
       var data = await response.json().catch(function () { return {}; });
@@ -264,24 +348,116 @@
     clearError();
     setArtifactState('rec', 'generating');
     setBtnLoading(generateRecBtn, true);
+
+    var pageUrl = pageUrlInput.value.trim();
+    var cardSelector = recCardSelectorInput.value.trim();
+    var cardHtml = recHtmlInput.value;
+
+    var canRunLLM = recsAvailable && pageUrl && cardSelector && cardHtml.trim();
+
     try {
-      var response = await fetch('/recommendations-template', {
+      if (!canRunLLM) {
+        var fallback = await fetch('/recommendations-template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        var fbData = await fallback.json().catch(function () { return {}; });
+        if (!fallback.ok) {
+          setArtifactState('rec', 'failed');
+          showError(fbData.error || 'Recommendations template failed.');
+          return;
+        }
+        recsCardBody = '';
+        setArtifactState('rec', 'ready', fbData.recTemplate || '');
+        addHistoryEntry(pageUrl, { recTemplate: fbData.recTemplate });
+        return;
+      }
+
+      var response = await fetch('/generate-recs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          pageUrl: pageUrl,
+          cardSelector: cardSelector,
+          cardHtml: cardHtml,
+          extractedStyles: extractedRecsStyles,
+        }),
       });
       var data = await response.json().catch(function () { return {}; });
       if (!response.ok) {
         setArtifactState('rec', 'failed');
-        showError(data.error || 'Recommendations template failed.');
+        if (response.status >= 502 && response.status <= 504) showError(TIMEOUT_MSG);
+        else showError(data.error || 'Recs generation failed (' + response.status + ').');
         return;
       }
-      setArtifactState('rec', 'ready', data.recTemplate || '');
+      if (!data.recsTemplate) {
+        setArtifactState('rec', 'failed');
+        showError('Recs generation returned empty output.');
+        return;
+      }
+      recsCardBody = data.cardBody || '';
+      setArtifactState('rec', 'ready', data.recsTemplate);
+      addHistoryEntry(pageUrl, { recTemplate: data.recsTemplate });
     } catch (err) {
       setArtifactState('rec', 'failed');
-      showError('Network error during recommendations generation. Try again.');
+      showError(err.name === 'TypeError' ? TIMEOUT_MSG : 'Network error during recommendations generation. Try again.');
     } finally {
       setBtnLoading(generateRecBtn, false);
+      refreshSectionButtons();
+    }
+  }
+
+  async function regenerateRecsWithFeedback() {
+    clearError();
+    var issues = getCheckedRecIssues();
+    var note = feedbackNote.value.trim();
+    if (issues.length === 0 && !note) {
+      showError('Select an issue or provide feedback text.');
+      return;
+    }
+    if (!recsCardBody) {
+      showError('No previous recs card body to refine — regenerate from the main panel first.');
+      return;
+    }
+
+    setBtnLoading(regenerateBtn, true);
+    setArtifactState('rec', 'generating');
+    try {
+      var response = await fetch('/regenerate-recs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardHtml: recHtmlInput.value,
+          extractedStyles: extractedRecsStyles,
+          previousCardBody: recsCardBody,
+          issues: issues,
+          feedbackNote: note,
+        }),
+      });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        setArtifactState('rec', 'failed');
+        if (response.status >= 502 && response.status <= 504) showError(TIMEOUT_MSG);
+        else showError(data.error || 'Recs regeneration failed (' + response.status + ').');
+        return;
+      }
+      if (!data.recsTemplate) {
+        setArtifactState('rec', 'failed');
+        showError('Recs regeneration returned empty output.');
+        return;
+      }
+      recsCardBody = data.cardBody || '';
+      setArtifactState('rec', 'ready', data.recsTemplate);
+      addHistoryEntry(pageUrlInput.value.trim(), { recTemplate: data.recsTemplate });
+      modalCode.value = data.recsTemplate;
+      switchModalTab('code');
+      resetFeedbackForm();
+    } catch (err) {
+      setArtifactState('rec', 'failed');
+      showError(err.name === 'TypeError' ? TIMEOUT_MSG : 'Network error during regeneration. Try again.');
+    } finally {
+      setBtnLoading(regenerateBtn, false);
     }
   }
 
@@ -338,18 +514,35 @@
 
   function getCheckedIssues() {
     var issues = [];
-    issueCheckboxes.forEach(function (cb) { if (cb.checked) issues.push(cb.value); });
+    heroIssueCheckboxes.forEach(function (cb) { if (cb.checked) issues.push(cb.value); });
     return issues;
   }
 
+  function getCheckedRecIssues() {
+    var issues = [];
+    recIssueCheckboxes.forEach(function (cb) { if (cb.checked) issues.push(cb.value); });
+    return issues;
+  }
+
+  function activeIssueCount() {
+    return currentModalArtifact === 'rec' ? getCheckedRecIssues().length : getCheckedIssues().length;
+  }
+
   function updateRegenerateEnabled() {
-    regenerateBtn.disabled = getCheckedIssues().length === 0 && !feedbackNote.value.trim();
+    regenerateBtn.disabled = activeIssueCount() === 0 && !feedbackNote.value.trim();
   }
 
   function resetFeedbackForm() {
     feedbackNote.value = '';
-    issueCheckboxes.forEach(function (cb) { cb.checked = false; });
+    heroIssueCheckboxes.forEach(function (cb) { cb.checked = false; });
+    recIssueCheckboxes.forEach(function (cb) { cb.checked = false; });
     regenerateBtn.disabled = true;
+  }
+
+  function setRegenerateLabel() {
+    var labelEl = regenerateBtn.querySelector('.btn-label');
+    if (!labelEl) return;
+    labelEl.textContent = currentModalArtifact === 'rec' ? 'Regenerate Recs' : 'Regenerate Hero';
   }
 
   function switchModalTab(tab) {
@@ -357,12 +550,17 @@
       btn.classList.toggle('is-active', btn.dataset.tab === tab);
     });
     var refineActive = tab === 'refine';
-    var soon = currentModalArtifact === 'rec';
+    var isRec = currentModalArtifact === 'rec';
+
     modalCodePanel.hidden = tab !== 'code';
-    modalRefinePanel.hidden = !refineActive || soon;
-    modalRefineSoonPanel.hidden = !refineActive || !soon;
+    modalRefinePanel.hidden = !refineActive;
     modalCopyBtn.hidden = tab !== 'code';
-    regenerateBtn.hidden = !refineActive || soon;
+    regenerateBtn.hidden = !refineActive;
+
+    heroFeedbackChecks.hidden = isRec;
+    recFeedbackChecks.hidden = !isRec;
+    setRegenerateLabel();
+    updateRegenerateEnabled();
   }
 
   function openModal(key) {
@@ -372,20 +570,27 @@
     modalHeading.textContent = record.label;
     modalCode.value = record.value;
 
-    var showTabs = key === 'hero' || key === 'rec';
+    var showTabs = key === 'hero' || (key === 'rec' && recsCardBody);
     modalTabs.hidden = !showTabs;
     if (showTabs) {
       switchModalTab('code');
     } else {
       modalCodePanel.hidden = false;
       modalRefinePanel.hidden = true;
-      modalRefineSoonPanel.hidden = true;
       modalCopyBtn.hidden = false;
       regenerateBtn.hidden = true;
     }
 
     modal.hidden = false;
     document.body.classList.add('modal-open');
+  }
+
+  function dispatchRegenerate() {
+    if (currentModalArtifact === 'rec') {
+      regenerateRecsWithFeedback();
+    } else {
+      regenerateHeroWithFeedback();
+    }
   }
 
   function closeModal() {
@@ -408,7 +613,7 @@
   openSitemapBtn.addEventListener('click', function () { openModal('sitemap'); });
   openHeroBtn.addEventListener('click', function () { openModal('hero'); });
   openRecBtn.addEventListener('click', function () { openModal('rec'); });
-  regenerateBtn.addEventListener('click', regenerateHeroWithFeedback);
+  regenerateBtn.addEventListener('click', dispatchRegenerate);
 
   modalTabButtons.forEach(function (btn) {
     btn.addEventListener('click', function () { switchModalTab(btn.dataset.tab); });
@@ -421,12 +626,18 @@
     if (e.key === 'Escape' && !modal.hidden) closeModal();
   });
 
-  issueCheckboxes.forEach(function (cb) { cb.addEventListener('change', updateRegenerateEnabled); });
+  heroIssueCheckboxes.forEach(function (cb) { cb.addEventListener('change', updateRegenerateEnabled); });
+  recIssueCheckboxes.forEach(function (cb) { cb.addEventListener('change', updateRegenerateEnabled); });
   feedbackNote.addEventListener('input', updateRegenerateEnabled);
 
   manualToggle.addEventListener('change', function () { setEditable(this.checked); });
   targetSelectorInput.addEventListener('input', refreshSectionButtons);
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
+
+  recManualToggle.addEventListener('change', function () { setRecEditable(this.checked); });
+  recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
+  recCardSelectorInput.addEventListener('input', refreshSectionButtons);
+  recHtmlInput.addEventListener('input', refreshSectionButtons);
 
   function copyAction(btn, getValue) {
     btn.addEventListener('click', async function () {
