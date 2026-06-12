@@ -524,6 +524,10 @@ function setRecStatus(message) {
     modalHeading.textContent = record.label;
     modalCode.value = record.value;
 
+    var isRec = key === 'rec';
+    heroFeedbackChecks.hidden = isRec;
+    recFeedbackChecks.hidden = !isRec;
+
     var showTabs = key === 'hero' || (key === 'rec' && recsCardBody);
     modalTabs.hidden = !showTabs;
     if (showTabs) {
