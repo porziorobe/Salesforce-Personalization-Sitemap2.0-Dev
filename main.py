@@ -523,6 +523,11 @@ Rules:
    The customer's existing stylesheets will style these class names on the live page.
    Do NOT flatten the hierarchy. Do NOT invent generic class names.
 
+   You do NOT need to reproduce the OUTERMOST element of CARD_HTML - it will be
+   reattached automatically after generation. Focus on the inner content. Do NOT
+   invent a new card-frame wrapper or add inline background/border/shadow styles
+   to a top-level element - those would conflict with the reattached wrapper.
+
 2. SLOT EXACTLY 3 subVar VARIABLES - NO OTHERS, NO EXCEPTIONS:
    - {{{{subVar 'image'}}}} - src of the card's product image
    - {{{{subVar 'name'}}}} - text content of the card's title/heading
@@ -549,17 +554,24 @@ Rules:
    the card (only in this case, since no customer markup exists to preserve):
    {{{{#if (subVar 'image')}}}}<img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}
 
-4. DROP CONTENT THAT DOESN'T MAP TO THE 3 VARIABLES.
-   Description text, price, category labels, ratings, badges, "READ THE BLOG"
-   secondary CTAs - if they don't map to image/name/linkUrl, REMOVE the element
-   entirely. Do NOT leave the text static, do NOT invent new subVars.
-   The card's primary link should use {{{{subVar 'linkUrl'}}}} as href.
+4. PRESERVE THE CARD'S CTA ELEMENT.
+   Preserve the card's primary CTA element - the styled link or button that
+   already exists in CARD_HTML and points to the article/product. Rewrite its
+   `href` to use {{{{subVar 'linkUrl'}}}}, but keep its tag, class names, inline
+   styles, and visible text exactly as they appear. The CTA text is part of the
+   customer's branding - do NOT replace it with a subVar and do NOT remove the
+   element.
 
-5. STRIP REMAINING NOISE.
+5. REMOVE PER-CARD DATA NOT MAPPED TO THE 3 VARIABLES.
+   Remove element nodes that carry per-card *data* not mapped to image/name/linkUrl
+   (descriptions, prices, ratings, dates, author, read-time, category labels). Do
+   NOT preserve them as static text, and do NOT invent subVars for them.
+
+6. STRIP REMAINING NOISE.
    Remove video, audio, modal, script, popup, and interactive elements not part
-   of the card's link. Remove empty wrapper divs that result from rule 4.
+   of the card's link or CTA. Remove empty wrapper divs that result from rule 5.
 
-6. INLINE STYLES - use sparingly.
+7. INLINE STYLES - use sparingly.
    Keep inline styles already in CARD_HTML. Add inline styles only where essential
    (image sizing per the pattern above). Do NOT add a <style> block. If you add
    fallback styles, use EXTRACTED_STYLES values as inline style attributes.
@@ -608,7 +620,16 @@ RULES:
   customer's <img> class names and parent wrappers (<picture>, <figure>,
   anchor wrappers, etc.) exactly as they appear in CARD_HTML. Do NOT add
   width/display inline styles to the <img>.
-- Preserve the customer's DOM structure and class names from CARD_HTML.
+- Preserve the customer's DOM structure and class names from CARD_HTML. The
+  outermost element is reattached automatically - do NOT invent a new card-frame
+  wrapper or add inline background/border/shadow on a top-level element.
+- Preserve the card's primary CTA element (the styled link or button that points
+  to the article/product). Rewrite its href to use {{subVar 'linkUrl'}}, but keep
+  its tag, class names, inline styles, and visible text. The CTA text is part of
+  the customer's branding - do not replace it with a subVar and do not remove it.
+- Remove element nodes that carry per-card *data* not mapped to image/name/linkUrl
+  (descriptions, prices, ratings, dates, author, read-time, category labels). Do
+  not preserve them as static text and do not invent subVars for them.
 - Do NOT add a <style> block. Use inline styles only where CARD_HTML already has them
   or where essential.
 - Output ONLY the corrected per-card HTML body. No JavaScript, no boilerplate, no
@@ -1220,6 +1241,50 @@ _SUBVAR_IF_BLOCK = re.compile(
 )
 
 
+def reattach_outer_wrapper(card_body, original_card_html):
+    """
+    Ensure the LLM-generated card body is wrapped in the customer's outermost
+    element (tag + classes + inline style + id). The LLM frequently drops this
+    wrapper, which strips the customer's card frame (background, border, shadow).
+    No-op when the LLM has already preserved the wrapper (same tag, classes
+    subset matches).
+    """
+    if not card_body or not original_card_html:
+        return card_body
+
+    try:
+        orig_root = BeautifulSoup(original_card_html, "html.parser").find(True)
+    except Exception:
+        return card_body
+    if not orig_root:
+        return card_body
+
+    try:
+        body_root = BeautifulSoup(card_body, "html.parser").find(True)
+    except Exception:
+        body_root = None
+
+    orig_classes = set(orig_root.get("class", []) or [])
+    if body_root and body_root.name == orig_root.name:
+        body_classes = set(body_root.get("class", []) or [])
+        if not orig_classes or orig_classes.issubset(body_classes):
+            return card_body
+
+    attrs = []
+    classes = orig_root.get("class")
+    if classes:
+        attrs.append(f'class="{" ".join(classes)}"')
+    style = orig_root.get("style")
+    if style:
+        attrs.append(f'style="{style}"')
+    elem_id = orig_root.get("id")
+    if elem_id:
+        attrs.append(f'id="{elem_id}"')
+
+    attrs_str = (" " + " ".join(attrs)) if attrs else ""
+    return f"<{orig_root.name}{attrs_str}>\n{card_body}\n</{orig_root.name}>"
+
+
 def sanitize_recs_output(html):
     """
     Defensive cleanup of recs LLM output:
@@ -1370,6 +1435,7 @@ def generate_recs():
     card_body = strip_markdown_fences(card_body)
     card_body = inline_extracted_styles(card_body, extracted_styles)
     card_body = sanitize_recs_output(card_body)
+    card_body = reattach_outer_wrapper(card_body, card_html)
 
     full_template = wrap_recs_card(card_body)
     return jsonify(recsTemplate=full_template, cardBody=card_body)
@@ -1430,6 +1496,7 @@ def regenerate_recs():
     card_body = strip_markdown_fences(card_body)
     card_body = inline_extracted_styles(card_body, extracted_styles)
     card_body = sanitize_recs_output(card_body)
+    card_body = reattach_outer_wrapper(card_body, card_html)
 
     full_template = wrap_recs_card(card_body)
     return jsonify(recsTemplate=full_template, cardBody=card_body)
