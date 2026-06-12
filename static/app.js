@@ -14,6 +14,8 @@
   var generateSitemapBtn = document.getElementById('generate-sitemap-btn');
   var generateHeroBtn = document.getElementById('generate-hero-btn');
   var generateRecBtn = document.getElementById('generate-rec-btn');
+  var defaultHeroBtn = document.getElementById('default-hero-btn');
+  var defaultRecBtn = document.getElementById('default-rec-btn');
 
   var openSitemapBtn = document.getElementById('open-sitemap-btn');
   var openHeroBtn = document.getElementById('open-hero-btn');
@@ -315,6 +317,37 @@ function setRecStatus(message) {
     }
   }
 
+  async function useDefaultHeroTemplate() {
+    clearError();
+    setArtifactState('hero', 'generating');
+    try {
+      var response = await fetch('/hero-template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok || !data.heroTemplate) { setArtifactState('hero', 'failed'); showError('Default hero template failed.'); return; }
+      setArtifactState('hero', 'ready', data.heroTemplate);
+      addHistoryEntry(pageUrlInput.value.trim(), { heroTemplate: data.heroTemplate });
+    } catch (err) {
+      setArtifactState('hero', 'failed');
+      showError('Network error loading default hero template.');
+    }
+  }
+
+  async function useDefaultRecTemplate() {
+    clearError();
+    setArtifactState('rec', 'generating');
+    try {
+      var response = await fetch('/recommendations-template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok || !data.recTemplate) { setArtifactState('rec', 'failed'); showError('Default recs template failed.'); return; }
+      recsCardBody = data.recTemplate;
+      setArtifactState('rec', 'ready', data.recTemplate);
+      addHistoryEntry(pageUrlInput.value.trim(), { recTemplate: data.recTemplate });
+    } catch (err) {
+      setArtifactState('rec', 'failed');
+      showError('Network error loading default recs template.');
+    }
+  }
+
   async function generateRecommendations() {
     clearError();
     setArtifactState('rec', 'generating');
@@ -568,6 +601,8 @@ function setRecStatus(message) {
   generateSitemapBtn.addEventListener('click', generateSitemap);
   generateHeroBtn.addEventListener('click', generateHero);
   generateRecBtn.addEventListener('click', generateRecommendations);
+  defaultHeroBtn.addEventListener('click', useDefaultHeroTemplate);
+  defaultRecBtn.addEventListener('click', useDefaultRecTemplate);
   openSitemapBtn.addEventListener('click', function () { openModal('sitemap'); });
   openHeroBtn.addEventListener('click', function () { openModal('hero'); });
   openRecBtn.addEventListener('click', function () { openModal('rec'); });

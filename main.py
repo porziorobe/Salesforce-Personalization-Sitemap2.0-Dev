@@ -1184,6 +1184,71 @@ def assemble_sitemap_endpoint():
     return jsonify(sitemap=sitemap_js)
 
 
+DEFAULT_HERO_TEMPLATE_HTML = r"""<style>
+    .sfdcep-hero {
+        position: relative;
+        width: 100%;
+        min-height: 480px;
+        display: flex;
+        align-items: center;
+        background: url('{{subVar 'BackgroundImageUrl'}}') no-repeat center center / cover;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    .sfdcep-hero__overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+    }
+    .sfdcep-hero__content {
+        position: relative;
+        z-index: 1;
+        max-width: 640px;
+        padding: 48px 40px;
+        color: #ffffff;
+    }
+    .sfdcep-hero__heading {
+        font-size: 40px;
+        font-weight: 700;
+        line-height: 1.15;
+        margin: 0 0 16px;
+        color: #ffffff;
+    }
+    .sfdcep-hero__subheading {
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 1.5;
+        margin: 0 0 28px;
+        color: #eeeeee;
+    }
+    .sfdcep-hero__cta {
+        display: inline-block;
+        padding: 12px 28px;
+        background: #097fb3;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    .sfdcep-hero__cta:hover {
+        background: #065f87;
+    }
+</style>
+<div class="sfdcep-hero" style="background-image:url('{{subVar 'BackgroundImageUrl'}}')">
+    <div class="sfdcep-hero__overlay"></div>
+    <div class="sfdcep-hero__content">
+        <h1 class="sfdcep-hero__heading">{{subVar 'Header'}}</h1>
+        <p class="sfdcep-hero__subheading">{{subVar 'Subheader'}}</p>
+        <a class="sfdcep-hero__cta" href="{{subVar 'CallToActionUrl'}}">{{subVar 'CallToActionText'}}</a>
+    </div>
+</div>"""
+
+
+@app.route("/hero-template", methods=["POST"])
+def hero_template_endpoint():
+    return jsonify(heroTemplate=DEFAULT_HERO_TEMPLATE_HTML)
+
+
 @app.route("/recommendations-template", methods=["POST"])
 def recommendations_template_endpoint():
     return jsonify(recTemplate=CARD_EXPERIENCE_TEMPLATE_HTML)
