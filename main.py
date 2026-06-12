@@ -596,21 +596,24 @@ no boilerplate, no markdown fences, no commentary."""
 
 
 RECS_ISSUE_INSTRUCTIONS = {
-    "image_missing": (
-        "CARD IMAGE: Ensure {{subVar 'image'}} is used as the src of the card's image, "
-        "wrapped in {{#if (subVar 'image')}}...{{else}}<placeholder>{{/if}}."
+    "container_layout": (
+        "CONTAINER LAYOUT: Fix the outer container's layout — correct the flex/grid "
+        "structure, column arrangement, or spacing so cards display in the intended row/grid pattern. "
+        "Use CONTAINER_HTML as the reference."
     ),
-    "title_wrong": (
-        "CARD TITLE: Ensure {{subVar 'name'}} is the text content of the card's heading "
-        "element. Preserve the customer's class names on the heading."
+    "container_styling": (
+        "CONTAINER STYLING: Fix the outer container's visual styling — background color, "
+        "padding, border, or other cosmetic properties. Apply changes as inline styles on "
+        "the container element."
     ),
-    "link_broken": (
-        "CARD LINK: Ensure the card's anchor uses href=\"{{subVar 'linkUrl'}}\". "
-        "Preserve the customer's link styling."
-    ),
-    "layout_wrong": (
-        "LAYOUT: The card structure should more closely mirror CARD_HTML. Preserve the "
+    "card_layout": (
+        "CARD LAYOUT: The card structure should more closely mirror CARD_HTML. Preserve the "
         "customer's wrapper divs, class names, and nesting."
+    ),
+    "card_content": (
+        "CARD CONTENT: Fix content issues inside the card — remove duplicate elements, "
+        "strip static text that should have been removed, ensure all three subVar variables "
+        "(image, name, linkUrl) are correctly placed and rendering."
     ),
 }
 
