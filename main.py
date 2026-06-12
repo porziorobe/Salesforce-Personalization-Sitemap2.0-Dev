@@ -567,8 +567,11 @@ Rules:
    keep its tag, class names, inline styles, and visible text exactly as they appear.
 
 7. REMOVE PER-CARD DATA NOT MAPPED TO THE 3 VARIABLES.
-   Remove element nodes for descriptions, prices, ratings, dates, author, read-time,
-   category labels. Do NOT preserve them as static text. Do NOT invent subVars for them.
+   Remove ALL element nodes carrying per-card data not mapped to image/name/linkUrl.
+   This includes: <p> description paragraphs, prices, ratings, dates, author,
+   read-time, category labels, overlay content sections, and any static text copied
+   verbatim from CARD_HTML. Do NOT preserve them as static text.
+   Do NOT invent subVars for them. Remove empty wrapper divs left behind.
 
 8. STRIP REMAINING NOISE.
    Remove video, audio, modal, script, popup, and interactive elements not part of
@@ -626,7 +629,9 @@ RULES:
 - Preserve the customer's card DOM structure and class names from CARD_HTML.
 - Preserve the card's primary CTA element. Rewrite its href to {{subVar 'linkUrl'}},
   keep its tag, class names, inline styles, and visible text.
-- Remove per-card data not mapped to image/name/linkUrl. Do not invent subVars.
+- Remove ALL per-card data not mapped to image/name/linkUrl: <p> descriptions,
+  prices, ratings, dates, overlay content, static text copied from CARD_HTML.
+  Do not preserve as static text. Do not invent subVars. Remove empty wrappers left behind.
 - Do NOT add a <style> block. Use inline styles only where essential.
 - Output ONLY the corrected complete template. No JavaScript, no boilerplate, no
   markdown fences, no commentary.
@@ -1597,7 +1602,6 @@ def generate_recs():
     full_template = strip_markdown_fences(full_template)
     full_template = inline_extracted_styles(full_template, extracted_styles)
     full_template = sanitize_recs_output(full_template)
-    full_template = stamp_extracted_tokens(full_template, extracted_styles)
 
     return jsonify(recsTemplate=full_template, cardBody=full_template)
 
@@ -1661,7 +1665,6 @@ def regenerate_recs():
     full_template = strip_markdown_fences(full_template)
     full_template = inline_extracted_styles(full_template, extracted_styles)
     full_template = sanitize_recs_output(full_template)
-    full_template = stamp_extracted_tokens(full_template, extracted_styles)
 
     return jsonify(recsTemplate=full_template, cardBody=full_template)
 
