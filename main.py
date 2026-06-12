@@ -523,24 +523,40 @@ Rules:
    The customer's existing stylesheets will style these class names on the live page.
    Do NOT flatten the hierarchy. Do NOT invent generic class names.
 
-2. SLOT THE 3 MANDATORY subVar VARIABLES:
+2. SLOT EXACTLY 3 subVar VARIABLES - NO OTHERS, NO EXCEPTIONS:
    - {{{{subVar 'image'}}}} - src of the card's product image
    - {{{{subVar 'name'}}}} - text content of the card's title/heading
    - {{{{subVar 'linkUrl'}}}} - href of the card's link
-   Wrap the image in {{{{#if (subVar 'image')}}}}...{{{{else}}}}<placeholder fallback>{{{{/if}}}}.
 
-3. OPTIONAL subVar VARIABLES (include only if CARD_HTML clearly has these):
-   - {{{{subVar 'price'}}}} - price text
-   - {{{{subVar 'description'}}}} - short description text
+   ALL THREE MUST APPEAR. Do NOT add any other subVar variables (no 'price',
+   'description', 'category', 'rating', etc.) - the data binding only provides
+   these three fields. Inventing other variables breaks the live integration.
 
-4. STRIP REMAINING NOISE.
-   Remove video, audio, modal, script, button-as-popup, and interactive elements
-   not part of the card's link. Remove empty wrapper divs.
+3. IMAGE IS MANDATORY - synthesize one if CARD_HTML lacks an <img>.
+   The card MUST contain an image element using {{{{subVar 'image'}}}} with a
+   placeholder fallback. Use this EXACT pattern (copy it verbatim, including the
+   placeholder URL):
 
-5. INLINE STYLES - use sparingly.
+   {{{{#if (subVar 'image')}}}}<img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}" style="width:100%;display:block;">{{{{else}}}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="" style="width:100%;display:block;">{{{{/if}}}}
+
+   If CARD_HTML has no image, place the above pattern at the top of the card. If
+   CARD_HTML has an image, replace its src/alt with the pattern above while keeping
+   the image's existing wrapper element and class names.
+
+4. DROP CONTENT THAT DOESN'T MAP TO THE 3 VARIABLES.
+   Description text, price, category labels, ratings, badges, "READ THE BLOG"
+   secondary CTAs - if they don't map to image/name/linkUrl, REMOVE the element
+   entirely. Do NOT leave the text static, do NOT invent new subVars.
+   The card's primary link should use {{{{subVar 'linkUrl'}}}} as href.
+
+5. STRIP REMAINING NOISE.
+   Remove video, audio, modal, script, popup, and interactive elements not part
+   of the card's link. Remove empty wrapper divs that result from rule 4.
+
+6. INLINE STYLES - use sparingly.
    Keep inline styles already in CARD_HTML. Add inline styles only where essential
-   (e.g. ensuring the image renders at consistent size). Do NOT add a <style> block.
-   If you add fallback styles, use EXTRACTED_STYLES values as inline style attributes.
+   (image sizing per the pattern above). Do NOT add a <style> block. If you add
+   fallback styles, use EXTRACTED_STYLES values as inline style attributes.
 
 === INPUTS ===
 - CARD_HTML:
@@ -549,8 +565,9 @@ Rules:
 {extracted_styles}
 
 === OUTPUT ===
-Output ONLY the per-card HTML body. No <style> block, no {{{{#each}}}} wrapper, no
-outer container, no JavaScript, no boilerplate, no markdown fences, no commentary."""
+Output ONLY the per-card HTML body containing exactly the 3 subVar variables above.
+No <style> block, no {{{{#each}}}} wrapper, no outer container, no JavaScript, no
+boilerplate, no markdown fences, no commentary."""
 
 
 RECS_ISSUE_INSTRUCTIONS = {
@@ -578,7 +595,10 @@ The user has flagged specific issues.
 
 RULES:
 - Fix ONLY the per-card body. Do NOT add a {{#each}} wrapper or outer container.
-- The 3 mandatory subVar variables (image, name, linkUrl) remain MANDATORY.
+- EXACTLY 3 subVar variables: image, name, linkUrl. NO OTHERS. Do NOT add price,
+  description, or any other subVar - the data binding only provides these three.
+- The image must use this exact pattern with a real placeholder URL:
+  {{#if (subVar 'image')}}<img src="{{subVar 'image'}}" alt="{{subVar 'name'}}" style="width:100%;display:block;">{{else}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="" style="width:100%;display:block;">{{/if}}
 - Preserve the customer's DOM structure and class names from CARD_HTML.
 - Do NOT add a <style> block. Use inline styles only where CARD_HTML already has them
   or where essential.
@@ -1165,6 +1185,48 @@ def inline_extracted_styles(html, styles):
     return _EXTRACTED_STYLES_LITERAL.sub(_sub, html)
 
 
+_PLACEHOLDER_LITERAL = re.compile(r"<placeholder[^>]*>", re.IGNORECASE)
+_RECS_ALLOWED_SUBVARS = {"image", "name", "linkUrl"}
+_SUBVAR_TOKEN = re.compile(r"\{\{\s*subVar\s+['\"]([\w]+)['\"]\s*\}\}")
+_SUBVAR_IF_BLOCK = re.compile(
+    r"\{\{#if\s*\(\s*subVar\s+['\"]([\w]+)['\"]\s*\)\s*\}\}"
+    r"(.*?)"
+    r"(?:\{\{else\}\}(.*?))?"
+    r"\{\{/if\}\}",
+    re.DOTALL,
+)
+
+
+def sanitize_recs_output(html):
+    """
+    Defensive cleanup of recs LLM output:
+    - Strip leaked <placeholder ...> meta-language literals.
+    - Remove {{#if (subVar 'X')}}...{{/if}} blocks for variables outside the allowed set
+      (image/name/linkUrl), keeping only the 'else' branch if present.
+    - Replace stray {{subVar 'X'}} tokens for disallowed names with empty string.
+    """
+    if not html:
+        return html
+
+    cleaned = _PLACEHOLDER_LITERAL.sub("", html)
+
+    def _strip_disallowed_if(match):
+        var_name = match.group(1)
+        if var_name in _RECS_ALLOWED_SUBVARS:
+            return match.group(0)
+        else_branch = match.group(3) or ""
+        return else_branch
+
+    cleaned = _SUBVAR_IF_BLOCK.sub(_strip_disallowed_if, cleaned)
+
+    def _strip_disallowed_token(match):
+        var_name = match.group(1)
+        return match.group(0) if var_name in _RECS_ALLOWED_SUBVARS else ""
+
+    cleaned = _SUBVAR_TOKEN.sub(_strip_disallowed_token, cleaned)
+    return cleaned
+
+
 def strip_markdown_fences(text):
     text = text.strip()
     if text.startswith("```"):
@@ -1284,6 +1346,7 @@ def generate_recs():
     card_body = result if isinstance(result, str) else str(result)
     card_body = strip_markdown_fences(card_body)
     card_body = inline_extracted_styles(card_body, extracted_styles)
+    card_body = sanitize_recs_output(card_body)
 
     full_template = wrap_recs_card(card_body)
     return jsonify(recsTemplate=full_template, cardBody=card_body)
@@ -1343,6 +1406,7 @@ def regenerate_recs():
     card_body = result if isinstance(result, str) else str(result)
     card_body = strip_markdown_fences(card_body)
     card_body = inline_extracted_styles(card_body, extracted_styles)
+    card_body = sanitize_recs_output(card_body)
 
     full_template = wrap_recs_card(card_body)
     return jsonify(recsTemplate=full_template, cardBody=card_body)
