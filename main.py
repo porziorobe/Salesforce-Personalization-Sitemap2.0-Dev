@@ -532,16 +532,22 @@ Rules:
    'description', 'category', 'rating', etc.) - the data binding only provides
    these three fields. Inventing other variables breaks the live integration.
 
-3. IMAGE IS MANDATORY - synthesize one if CARD_HTML lacks an <img>.
-   The card MUST contain an image element using {{{{subVar 'image'}}}} with a
-   placeholder fallback. Use this EXACT pattern (copy it verbatim, including the
-   placeholder URL):
+3. IMAGE IS MANDATORY - preserve the customer's image element and wrapper chain.
+   If CARD_HTML has an <img>, keep that <img> tag's class names and ALL of its
+   parent wrappers (e.g. <picture>, <figure>, anchor wrappers, container divs)
+   exactly as they appear in CARD_HTML. Only change the <img>'s src and alt and
+   wrap it in an if/else for fallback. Example - if CARD_HTML has:
+       <picture class="x-pic"><a class="x-link"><img class="x-img" src="..." alt="..."></a></picture>
+   Output:
+       <picture class="x-pic"><a class="x-link" href="{{{{subVar 'linkUrl'}}}}">{{{{#if (subVar 'image')}}}}<img class="x-img" src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img class="x-img" src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}</a></picture>
 
-   {{{{#if (subVar 'image')}}}}<img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}" style="width:100%;display:block;">{{{{else}}}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="" style="width:100%;display:block;">{{{{/if}}}}
+   Do NOT add inline width/display styles to the <img> - the customer's class
+   names will style it via their existing stylesheets. Do NOT drop wrapper
+   elements like <picture>.
 
-   If CARD_HTML has no image, place the above pattern at the top of the card. If
-   CARD_HTML has an image, replace its src/alt with the pattern above while keeping
-   the image's existing wrapper element and class names.
+   If CARD_HTML has no <img> at all, insert this minimal pattern at the top of
+   the card (only in this case, since no customer markup exists to preserve):
+   {{{{#if (subVar 'image')}}}}<img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}
 
 4. DROP CONTENT THAT DOESN'T MAP TO THE 3 VARIABLES.
    Description text, price, category labels, ratings, badges, "READ THE BLOG"
@@ -597,8 +603,11 @@ RULES:
 - Fix ONLY the per-card body. Do NOT add a {{#each}} wrapper or outer container.
 - EXACTLY 3 subVar variables: image, name, linkUrl. NO OTHERS. Do NOT add price,
   description, or any other subVar - the data binding only provides these three.
-- The image must use this exact pattern with a real placeholder URL:
-  {{#if (subVar 'image')}}<img src="{{subVar 'image'}}" alt="{{subVar 'name'}}" style="width:100%;display:block;">{{else}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="" style="width:100%;display:block;">{{/if}}
+- The image must use {{subVar 'image'}} with an if/else fallback to
+  https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image. Preserve the
+  customer's <img> class names and parent wrappers (<picture>, <figure>,
+  anchor wrappers, etc.) exactly as they appear in CARD_HTML. Do NOT add
+  width/display inline styles to the <img>.
 - Preserve the customer's DOM structure and class names from CARD_HTML.
 - Do NOT add a <style> block. Use inline styles only where CARD_HTML already has them
   or where essential.
