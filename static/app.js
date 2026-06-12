@@ -7,6 +7,7 @@
   var targetHtmlInput = document.getElementById('target-html');
   var recContainerSelectorInput = document.getElementById('rec-container-selector');
   var recCardSelectorInput = document.getElementById('rec-card-selector');
+  var recContainerHtmlInput = document.getElementById('rec-container-html');
   var recHtmlInput = document.getElementById('rec-html');
   var recStatusNote = document.getElementById('rec-status-note');
 
@@ -50,7 +51,6 @@
   var extractedRecsStyles = null;
   var recsCardBody = '';
   var recsAvailable = false;
-  var recsContainerOuterHtml = '';
 
   var artifacts = {
     sitemap: { value: '', state: 'empty', label: 'Sitemap JS' },
@@ -99,6 +99,7 @@ function setRecStatus(message) {
   function recsInputsReady() {
     return recContainerSelectorInput.value.trim()
       && recCardSelectorInput.value.trim()
+      && recContainerHtmlInput.value.trim()
       && recHtmlInput.value.trim();
   }
 
@@ -106,13 +107,7 @@ function setRecStatus(message) {
     var ready = heroInputsReady();
     if (artifacts.sitemap.state !== 'generating') generateSitemapBtn.disabled = !ready;
     if (artifacts.hero.state !== 'generating') generateHeroBtn.disabled = !ready;
-    if (artifacts.rec.state !== 'generating') {
-      // Recs Generate is enabled either when LLM-ready (full inputs) or when the
-      // section is empty post-detect (clicks fall through to static placeholder).
-      var recsLLMReady = recsInputsReady();
-      var detectionRan = !detectedFields.hidden;
-      generateRecBtn.disabled = !(recsLLMReady || detectionRan);
-    }
+    if (artifacts.rec.state !== 'generating') generateRecBtn.disabled = !recsInputsReady();
   }
 
   var STATUS_LABELS = {
@@ -175,17 +170,17 @@ function setRecStatus(message) {
     if (recs && recs.containerSelector && recs.cardSelector) {
       recContainerSelectorInput.value = recs.containerSelector;
       recCardSelectorInput.value = recs.cardSelector;
+      recContainerHtmlInput.value = recs.containerOuterHtml || '';
       recHtmlInput.value = recs.exemplarOuterHtml || '';
-      recsContainerOuterHtml = recs.containerOuterHtml || '';
       recsAvailable = true;
       setRecStatus('');
     } else {
       recContainerSelectorInput.value = '';
       recCardSelectorInput.value = '';
+      recContainerHtmlInput.value = '';
       recHtmlInput.value = '';
-      recsContainerOuterHtml = '';
       recsAvailable = false;
-      setRecStatus('No recommendations section detected — fill in the fields below and Generate will use your input.');
+      setRecStatus('No recommendations section detected — fill in the fields below to generate.');
     }
   }
 
@@ -327,37 +322,18 @@ function setRecStatus(message) {
 
     var pageUrl = pageUrlInput.value.trim();
     var cardSelector = recCardSelectorInput.value.trim();
+    var containerHtml = recContainerHtmlInput.value;
     var cardHtml = recHtmlInput.value;
 
-    var canRunLLM = pageUrl && cardSelector && cardHtml.trim();
-
     try {
-      if (!canRunLLM) {
-        var fallback = await fetch('/recommendations-template', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        var fbData = await fallback.json().catch(function () { return {}; });
-        if (!fallback.ok) {
-          setArtifactState('rec', 'failed');
-          showError(fbData.error || 'Recommendations template failed.');
-          return;
-        }
-        recsCardBody = '';
-        setArtifactState('rec', 'ready', fbData.recTemplate || '');
-        addHistoryEntry(pageUrl, { recTemplate: fbData.recTemplate });
-        return;
-      }
-
       var response = await fetch('/generate-recs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageUrl: pageUrl,
           cardSelector: cardSelector,
+          containerHtml: containerHtml,
           cardHtml: cardHtml,
-          containerOuterHtml: recsContainerOuterHtml,
           extractedStyles: extractedRecsStyles,
         }),
       });
@@ -405,10 +381,10 @@ function setRecStatus(message) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          containerHtml: recContainerHtmlInput.value,
           cardHtml: recHtmlInput.value,
-          containerOuterHtml: recsContainerOuterHtml,
           extractedStyles: extractedRecsStyles,
-          previousCardBody: recsCardBody,
+          previousTemplate: recsCardBody,
           issues: issues,
           feedbackNote: note,
         }),
@@ -611,8 +587,9 @@ function setRecStatus(message) {
   targetSelectorInput.addEventListener('input', refreshSectionButtons);
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
-recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
+  recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
   recCardSelectorInput.addEventListener('input', refreshSectionButtons);
+  recContainerHtmlInput.addEventListener('input', refreshSectionButtons);
   recHtmlInput.addEventListener('input', refreshSectionButtons);
 
   function copyAction(btn, getValue) {

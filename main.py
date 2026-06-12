@@ -504,31 +504,42 @@ RULES:
 Output ONLY the corrected HTML. No JavaScript, no boilerplate, no markdown fences, no commentary."""
 
 
-RECS_LLM_PROMPT = """You are an expert at adapting website HTML into Salesforce Personalization Handlebars transformer card templates.
+RECS_LLM_PROMPT = """You are an expert at adapting website HTML into Salesforce Personalization Handlebars transformer templates.
 
-You will receive two inputs:
-1. CARD_HTML - The cleaned HTML of one product/recommendation card from the customer's site
-2. EXTRACTED_STYLES - Fallback CSS values extracted from the customer's card
+You will receive three inputs:
+1. CONTAINER_HTML - The outer container element from the customer's site that holds the cards
+2. CARD_HTML - The cleaned HTML of one product/recommendation card from the customer's site
+3. EXTRACTED_STYLES - Fallback CSS values extracted from the customer's card
 
 === TASK ===
 
-Adapt CARD_HTML into a Handlebars template for ONE card. The output will be looped
-externally via {{{{#each (subVar 'recs')}}}} - you do NOT write the loop, the wrapper
-container, or any <style> block. Output the per-card body only.
+Produce a complete Handlebars Experience Template. The output must be:
+
+    <container with {{#each}} loop>
+        {{#each (subVar 'recs')}}
+        <per-card body>
+        {{/each}}
+    </container>
+
+Use CONTAINER_HTML as the outer shell. Use CARD_HTML as the template source for the
+per-card body inside the loop.
 
 Rules:
 
-1. PRESERVE THE CUSTOMER'S CARD STRUCTURE.
+1. CONTAINER: use CONTAINER_HTML as the outer shell.
+   Keep its tag, class names, and existing inline styles. You may add or modify
+   inline styles on the container (e.g. background-color, display, gap) to make
+   the layout work — this is where layout and background decisions belong.
+   Do NOT invent a new container tag or class names.
+
+2. LOOP: wrap the per-card body in {{{{#each (subVar 'recs')}}}}...{{{{/each}}}}
+   directly inside the container element. No extra wrapper divs around the loop.
+
+3. CARD BODY: adapt CARD_HTML into the per-card Handlebars body.
    Keep the tag hierarchy, nesting, wrapper divs, and CSS class names from CARD_HTML.
-   The customer's existing stylesheets will style these class names on the live page.
    Do NOT flatten the hierarchy. Do NOT invent generic class names.
 
-   You do NOT need to reproduce the OUTERMOST element of CARD_HTML - it will be
-   reattached automatically after generation. Focus on the inner content. Do NOT
-   invent a new card-frame wrapper or add inline background/border/shadow styles
-   to a top-level element - those would conflict with the reattached wrapper.
-
-2. SLOT EXACTLY 3 subVar VARIABLES - NO OTHERS, NO EXCEPTIONS:
+4. SLOT EXACTLY 3 subVar VARIABLES - NO OTHERS, NO EXCEPTIONS:
    - {{{{subVar 'image'}}}} - src of the card's product image
    - {{{{subVar 'name'}}}} - text content of the card's title/heading
    - {{{{subVar 'linkUrl'}}}} - href of the card's link
@@ -537,7 +548,7 @@ Rules:
    'description', 'category', 'rating', etc.) - the data binding only provides
    these three fields. Inventing other variables breaks the live integration.
 
-3. IMAGE IS MANDATORY - preserve the customer's image element and wrapper chain.
+5. IMAGE IS MANDATORY - preserve the customer's image element and wrapper chain.
    If CARD_HTML has an <img>, keep that <img> tag's class names and ALL of its
    parent wrappers (e.g. <picture>, <figure>, anchor wrappers, container divs)
    exactly as they appear in CARD_HTML. Only change the <img>'s src and alt and
@@ -546,46 +557,39 @@ Rules:
    Output:
        <picture class="x-pic"><a class="x-link" href="{{{{subVar 'linkUrl'}}}}">{{{{#if (subVar 'image')}}}}<img class="x-img" src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img class="x-img" src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}</a></picture>
 
-   Do NOT add inline width/display styles to the <img> - the customer's class
-   names will style it via their existing stylesheets. Do NOT drop wrapper
-   elements like <picture>.
+   Do NOT add inline width/display styles to the <img>. Do NOT drop wrapper elements like <picture>.
 
-   If CARD_HTML has no <img> at all, insert this minimal pattern at the top of
-   the card (only in this case, since no customer markup exists to preserve):
+   If CARD_HTML has no <img> at all, insert this minimal pattern at the top of the card body:
    {{{{#if (subVar 'image')}}}}<img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}
 
-4. PRESERVE THE CARD'S CTA ELEMENT.
-   Preserve the card's primary CTA element - the styled link or button that
-   already exists in CARD_HTML and points to the article/product. Rewrite its
-   `href` to use {{{{subVar 'linkUrl'}}}}, but keep its tag, class names, inline
-   styles, and visible text exactly as they appear. The CTA text is part of the
-   customer's branding - do NOT replace it with a subVar and do NOT remove the
-   element.
+6. PRESERVE THE CARD'S CTA ELEMENT.
+   Keep the card's primary CTA link or button. Rewrite its href to {{{{subVar 'linkUrl'}}}},
+   keep its tag, class names, inline styles, and visible text exactly as they appear.
 
-5. REMOVE PER-CARD DATA NOT MAPPED TO THE 3 VARIABLES.
-   Remove element nodes that carry per-card *data* not mapped to image/name/linkUrl
-   (descriptions, prices, ratings, dates, author, read-time, category labels). Do
-   NOT preserve them as static text, and do NOT invent subVars for them.
+7. REMOVE PER-CARD DATA NOT MAPPED TO THE 3 VARIABLES.
+   Remove element nodes for descriptions, prices, ratings, dates, author, read-time,
+   category labels. Do NOT preserve them as static text. Do NOT invent subVars for them.
 
-6. STRIP REMAINING NOISE.
-   Remove video, audio, modal, script, popup, and interactive elements not part
-   of the card's link or CTA. Remove empty wrapper divs that result from rule 5.
+8. STRIP REMAINING NOISE.
+   Remove video, audio, modal, script, popup, and interactive elements not part of
+   the card's link or CTA. Remove empty wrapper divs that result from rule 7.
 
-7. INLINE STYLES - use sparingly.
-   Keep inline styles already in CARD_HTML. Add inline styles only where essential
-   (image sizing per the pattern above). Do NOT add a <style> block. If you add
-   fallback styles, use EXTRACTED_STYLES values as inline style attributes.
+9. INLINE STYLES - use sparingly on card elements.
+   Keep inline styles already in CARD_HTML. Add inline styles only where essential.
+   Do NOT add a <style> block.
 
 === INPUTS ===
+- CONTAINER_HTML:
+{container_html}
 - CARD_HTML:
 {card_html}
 - EXTRACTED_STYLES:
 {extracted_styles}
 
 === OUTPUT ===
-Output ONLY the per-card HTML body containing exactly the 3 subVar variables above.
-No <style> block, no {{{{#each}}}} wrapper, no outer container, no JavaScript, no
-boilerplate, no markdown fences, no commentary."""
+Output ONLY the complete Handlebars template (container + loop + per-card body).
+Exactly 3 subVar variables: image, name, linkUrl. No <style> block, no JavaScript,
+no boilerplate, no markdown fences, no commentary."""
 
 
 RECS_ISSUE_INSTRUCTIONS = {
@@ -608,31 +612,23 @@ RECS_ISSUE_INSTRUCTIONS = {
 }
 
 
-RECS_CORRECTION_PROMPT = """You are revising a Salesforce Personalization Handlebars per-card template.
+RECS_CORRECTION_PROMPT = """You are revising a Salesforce Personalization Handlebars Recommendations Experience Template.
 The user has flagged specific issues.
 
 RULES:
-- Fix ONLY the per-card body. Do NOT add a {{#each}} wrapper or outer container.
-- EXACTLY 3 subVar variables: image, name, linkUrl. NO OTHERS. Do NOT add price,
-  description, or any other subVar - the data binding only provides these three.
+- Output the complete corrected template: container + {{#each}} loop + per-card body.
+- You may modify the container's inline styles (e.g. background-color, padding, layout)
+  when the feedback calls for it. Keep the container's tag and class names.
+- EXACTLY 3 subVar variables: image, name, linkUrl. NO OTHERS.
 - The image must use {{subVar 'image'}} with an if/else fallback to
   https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image. Preserve the
-  customer's <img> class names and parent wrappers (<picture>, <figure>,
-  anchor wrappers, etc.) exactly as they appear in CARD_HTML. Do NOT add
-  width/display inline styles to the <img>.
-- Preserve the customer's DOM structure and class names from CARD_HTML. The
-  outermost element is reattached automatically - do NOT invent a new card-frame
-  wrapper or add inline background/border/shadow on a top-level element.
-- Preserve the card's primary CTA element (the styled link or button that points
-  to the article/product). Rewrite its href to use {{subVar 'linkUrl'}}, but keep
-  its tag, class names, inline styles, and visible text. The CTA text is part of
-  the customer's branding - do not replace it with a subVar and do not remove it.
-- Remove element nodes that carry per-card *data* not mapped to image/name/linkUrl
-  (descriptions, prices, ratings, dates, author, read-time, category labels). Do
-  not preserve them as static text and do not invent subVars for them.
-- Do NOT add a <style> block. Use inline styles only where CARD_HTML already has them
-  or where essential.
-- Output ONLY the corrected per-card HTML body. No JavaScript, no boilerplate, no
+  customer's <img> class names and parent wrappers exactly as they appear in CARD_HTML.
+- Preserve the customer's card DOM structure and class names from CARD_HTML.
+- Preserve the card's primary CTA element. Rewrite its href to {{subVar 'linkUrl'}},
+  keep its tag, class names, inline styles, and visible text.
+- Remove per-card data not mapped to image/name/linkUrl. Do not invent subVars.
+- Do NOT add a <style> block. Use inline styles only where essential.
+- Output ONLY the corrected complete template. No JavaScript, no boilerplate, no
   markdown fences, no commentary.
 
 === ISSUES TO FIX ===
@@ -641,16 +637,18 @@ RULES:
 {user_note}
 
 === ORIGINAL INPUTS ===
+- CONTAINER_HTML:
+{container_html}
 - CARD_HTML:
 {card_html}
 - EXTRACTED_STYLES:
 {extracted_styles}
 
-=== YOUR PREVIOUS PER-CARD HTML ===
-{previous_html}
+=== YOUR PREVIOUS TEMPLATE ===
+{previous_template}
 
 === OUTPUT ===
-Output ONLY the corrected per-card HTML body. No JavaScript, no boilerplate, no markdown fences, no commentary."""
+Output ONLY the corrected complete template. No JavaScript, no boilerplate, no markdown fences, no commentary."""
 
 
 _FALLBACK_CONTAINER_STYLE = (
@@ -1557,7 +1555,7 @@ def generate_recs():
     page_url = (data.get("pageUrl") or "").strip()
     card_html = data.get("cardHtml") or ""
     card_selector = (data.get("cardSelector") or "").strip()
-    container_outer_html = data.get("containerOuterHtml") or ""
+    container_html = data.get("containerHtml") or ""
     extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
 
     if not page_url:
@@ -1566,14 +1564,19 @@ def generate_recs():
         return jsonify(error="cardHtml is required."), 400
     if not card_selector:
         return jsonify(error="cardSelector is required."), 400
+    if not container_html.strip():
+        return jsonify(error="containerHtml is required."), 400
 
     try:
-        clean_html = sanitize_card_html(card_html)
+        clean_card_html = sanitize_card_html(card_html)
+        clean_container_html = sanitize_card_html(container_html)
     except Exception:
-        clean_html = card_html
+        clean_card_html = card_html
+        clean_container_html = container_html
 
     prompt = RECS_LLM_PROMPT.format(
-        card_html=clean_html,
+        container_html=clean_container_html,
+        card_html=clean_card_html,
         extracted_styles=json.dumps(extracted_styles, indent=2),
     )
 
@@ -1590,29 +1593,27 @@ def generate_recs():
     if result is None:
         return jsonify(error=_llm_error_message(last_err)), 502
 
-    card_body = result if isinstance(result, str) else str(result)
-    card_body = strip_markdown_fences(card_body)
-    card_body = inline_extracted_styles(card_body, extracted_styles)
-    card_body = sanitize_recs_output(card_body)
-    card_body = reattach_outer_wrapper(card_body, card_html)
-    card_body = stamp_extracted_tokens(card_body, extracted_styles)
+    full_template = result if isinstance(result, str) else str(result)
+    full_template = strip_markdown_fences(full_template)
+    full_template = inline_extracted_styles(full_template, extracted_styles)
+    full_template = sanitize_recs_output(full_template)
+    full_template = stamp_extracted_tokens(full_template, extracted_styles)
 
-    full_template = wrap_recs_card(card_body, container_outer_html)
-    return jsonify(recsTemplate=full_template, cardBody=card_body)
+    return jsonify(recsTemplate=full_template, cardBody=full_template)
 
 
 @app.route("/regenerate-recs", methods=["POST"])
 def regenerate_recs():
     data = request.get_json(silent=True) or {}
+    container_html = data.get("containerHtml") or ""
     card_html = data.get("cardHtml") or ""
-    container_outer_html = data.get("containerOuterHtml") or ""
     extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
-    previous_card_body = data.get("previousCardBody") or ""
+    previous_template = data.get("previousTemplate") or ""
     issues = data.get("issues") or []
     feedback_note = (data.get("feedbackNote") or "").strip()
 
-    if not previous_card_body.strip():
-        return jsonify(error="previousCardBody is required."), 400
+    if not previous_template.strip():
+        return jsonify(error="previousTemplate is required."), 400
 
     issue_lines = []
     for key in issues:
@@ -1628,16 +1629,19 @@ def regenerate_recs():
         user_note_section = f"=== ADDITIONAL USER FEEDBACK ===\n{feedback_note}"
 
     try:
-        clean_html = sanitize_card_html(card_html)
+        clean_card_html = sanitize_card_html(card_html)
+        clean_container_html = sanitize_card_html(container_html)
     except Exception:
-        clean_html = card_html
+        clean_card_html = card_html
+        clean_container_html = container_html
 
     prompt = RECS_CORRECTION_PROMPT.format(
         issue_list="\n".join(issue_lines),
         user_note=user_note_section,
-        card_html=clean_html,
+        container_html=clean_container_html,
+        card_html=clean_card_html,
         extracted_styles=json.dumps(extracted_styles, indent=2),
-        previous_html=previous_card_body.strip(),
+        previous_template=previous_template.strip(),
     )
 
     last_err = None
@@ -1653,15 +1657,13 @@ def regenerate_recs():
     if result is None:
         return jsonify(error=_llm_error_message(last_err)), 502
 
-    card_body = result if isinstance(result, str) else str(result)
-    card_body = strip_markdown_fences(card_body)
-    card_body = inline_extracted_styles(card_body, extracted_styles)
-    card_body = sanitize_recs_output(card_body)
-    card_body = reattach_outer_wrapper(card_body, card_html)
-    card_body = stamp_extracted_tokens(card_body, extracted_styles)
+    full_template = result if isinstance(result, str) else str(result)
+    full_template = strip_markdown_fences(full_template)
+    full_template = inline_extracted_styles(full_template, extracted_styles)
+    full_template = sanitize_recs_output(full_template)
+    full_template = stamp_extracted_tokens(full_template, extracted_styles)
 
-    full_template = wrap_recs_card(card_body, container_outer_html)
-    return jsonify(recsTemplate=full_template, cardBody=card_body)
+    return jsonify(recsTemplate=full_template, cardBody=full_template)
 
 
 if __name__ == "__main__":
