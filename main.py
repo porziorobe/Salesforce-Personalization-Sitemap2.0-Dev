@@ -831,12 +831,16 @@ NOISE_TAGS = {
     "button", "picture",
 }
 
+RECS_NOISE_TAGS = {
+    "script", "noscript", "iframe", "meta",
+    "video", "audio", "track",
+}
 
-def sanitize_html(raw_html):
-    """Strip interactive/media noise from TARGET_HTML while preserving structural DOM."""
+
+def _sanitize(raw_html, noise_tags):
     soup = BeautifulSoup(raw_html, "html.parser")
 
-    for tag in list(soup.find_all(NOISE_TAGS)):
+    for tag in list(soup.find_all(noise_tags)):
         tag.decompose()
 
     for comment in list(soup.find_all(string=lambda t: isinstance(t, Comment))):
@@ -854,6 +858,16 @@ def sanitize_html(raw_html):
                 del tag[attr]
 
     return str(soup).strip()
+
+
+def sanitize_html(raw_html):
+    """Strip interactive/media noise from TARGET_HTML while preserving structural DOM."""
+    return _sanitize(raw_html, NOISE_TAGS)
+
+
+def sanitize_card_html(raw_html):
+    """Card sanitizer: keep <picture>/<source> since they often carry the card image."""
+    return _sanitize(raw_html, RECS_NOISE_TAGS)
 
 
 def _usable(val):
@@ -1330,7 +1344,7 @@ def generate_recs():
         return jsonify(error="cardSelector is required."), 400
 
     try:
-        clean_html = sanitize_html(card_html)
+        clean_html = sanitize_card_html(card_html)
     except Exception:
         clean_html = card_html
 
@@ -1387,7 +1401,7 @@ def regenerate_recs():
         user_note_section = f"=== ADDITIONAL USER FEEDBACK ===\n{feedback_note}"
 
     try:
-        clean_html = sanitize_html(card_html)
+        clean_html = sanitize_card_html(card_html)
     except Exception:
         clean_html = card_html
 
