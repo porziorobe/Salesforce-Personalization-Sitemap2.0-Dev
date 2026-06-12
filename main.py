@@ -653,35 +653,64 @@ RULES:
 Output ONLY the corrected per-card HTML body. No JavaScript, no boilerplate, no markdown fences, no commentary."""
 
 
-RECS_TEMPLATE_WRAPPER = """<style>
-    .sfdcep-recs-carousel {{
-        width: 100%;
-        max-width: 1440px;
-        margin: 0 auto;
-        display: flex;
-        flex-flow: row wrap;
-        justify-content: space-evenly;
-        padding: 20px 0;
-        gap: 20px;
-    }}
-    .sfdcep-recs-card-wrapper {{
-        width: 22%;
-        min-width: 240px;
-        flex: 1 1 240px;
-    }}
-</style>
-<div class="sfdcep-recs-carousel">
-    {{{{#each (subVar 'recs')}}}}
-    <div class="sfdcep-recs-card-wrapper">
-{card_body}
-    </div>
-    {{{{/each}}}}
-</div>"""
+_FALLBACK_CONTAINER_STYLE = (
+    "display:flex;flex-flow:row wrap;justify-content:space-evenly;"
+    "gap:20px;padding:20px 0;width:100%;max-width:1440px;margin:0 auto"
+)
 
 
-def wrap_recs_card(card_body):
-    """Wrap an LLM-generated per-card body in the deterministic grid template."""
-    return RECS_TEMPLATE_WRAPPER.format(card_body=card_body)
+def _merge_inline_style(existing, additions):
+    """Merge a new inline-style declaration into an existing one without overriding existing keys."""
+    existing_keys = set()
+    if existing:
+        for decl in existing.split(";"):
+            decl = decl.strip()
+            if decl and ":" in decl:
+                existing_keys.add(decl.split(":", 1)[0].strip().lower())
+    add_decls = []
+    for decl in additions.split(";"):
+        decl = decl.strip()
+        if not decl or ":" not in decl:
+            continue
+        key = decl.split(":", 1)[0].strip().lower()
+        if key not in existing_keys:
+            add_decls.append(decl)
+    if not add_decls:
+        return existing or ""
+    base = (existing or "").rstrip(";").strip()
+    return (base + ("; " if base else "") + "; ".join(add_decls)).strip()
+
+
+def wrap_recs_card(card_body, container_outer_html=None):
+    """
+    Wrap an LLM-generated per-card body using the customer's captured container
+    when available; fall back to a minimal generic flex shell otherwise. Either
+    way, stamp live inline geometry so layout never depends on customer CSS
+    binding inside the iframe.
+    """
+    each_block = "{{#each (subVar 'recs')}}\n" + card_body + "\n{{/each}}"
+
+    if container_outer_html:
+        try:
+            soup = BeautifulSoup(container_outer_html, "html.parser")
+            container = soup.find(True)
+        except Exception:
+            container = None
+
+        if container:
+            container.clear()
+            existing_style = container.get("style", "")
+            container["style"] = _merge_inline_style(existing_style, _FALLBACK_CONTAINER_STYLE)
+            placeholder = "{{__RECS_EACH__}}"
+            container.append(placeholder)
+            rendered = str(container).replace(placeholder, each_block)
+            return rendered
+
+    return (
+        f'<div style="{_FALLBACK_CONTAINER_STYLE}">\n'
+        f"{each_block}\n"
+        "</div>"
+    )
 
 
 def fetch_page(url):
@@ -772,6 +801,7 @@ def detect_recs(soup):
                 "containerSelector": best_selector(container),
                 "cardSelector": best_selector(exemplar),
                 "exemplarOuterHtml": str(exemplar),
+                "containerOuterHtml": str(container),
             }
 
     # Pass 2: keyword + image structure.
@@ -786,6 +816,7 @@ def detect_recs(soup):
                 "containerSelector": best_selector(container),
                 "cardSelector": best_selector(with_img[0]),
                 "exemplarOuterHtml": str(with_img[0]),
+                "containerOuterHtml": str(container),
             }
 
     return None
@@ -1241,6 +1272,114 @@ _SUBVAR_IF_BLOCK = re.compile(
 )
 
 
+_CSS_KEY_FOR_BUCKET = {
+    "card": {
+        "backgroundColor": "background-color",
+        "borderRadius": "border-radius",
+        "boxShadow": "box-shadow",
+        "padding": "padding",
+    },
+    "card_image": {
+        "borderRadius": "border-radius",
+        "aspectRatio": "aspect-ratio",
+    },
+    "card_title": {
+        "fontSize": "font-size",
+        "fontWeight": "font-weight",
+        "color": "color",
+    },
+    "card_text": {
+        "fontSize": "font-size",
+        "color": "color",
+    },
+    "card_link": {
+        "color": "color",
+        "textDecoration": "text-decoration",
+        "fontWeight": "font-weight",
+    },
+}
+
+_CARD_NODE_FALLBACK = "min-width:240px;flex:1 1 240px"
+
+
+def _bucket_to_decl_string(bucket_dict, bucket_name):
+    """Convert an extracted bucket (camelCase keys) into a CSS declaration string."""
+    if not bucket_dict:
+        return ""
+    keymap = _CSS_KEY_FOR_BUCKET.get(bucket_name, {})
+    decls = []
+    for cam, css_key in keymap.items():
+        val = bucket_dict.get(cam)
+        if val and val != "auto":
+            decls.append(f"{css_key}:{val}")
+    return ";".join(decls)
+
+
+def _set_inline_style(tag, additions):
+    """Merge additions into a tag's inline style without overwriting existing keys."""
+    if not additions:
+        return
+    merged = _merge_inline_style(tag.get("style", ""), additions)
+    if merged:
+        tag["style"] = merged
+
+
+def stamp_extracted_tokens(card_body, extracted_recs_styles):
+    """
+    Walk the LLM output and stamp the customer's extracted style values as inline
+    styles onto mapped elements. Mapping:
+        card        -> outermost element
+        card_image  -> all <img> tags
+        card_title  -> first heading (h1-h6) or first <b>/<strong>
+        card_link   -> all <a> tags
+        card_text   -> all <p> tags
+
+    Also stamps the card-iteration fallback geometry (min-width / flex) on the
+    outermost element so cards size correctly even when the customer's container
+    CSS isn't present in the iframe.
+    """
+    if not card_body:
+        return card_body
+    if not extracted_recs_styles:
+        extracted_recs_styles = {}
+
+    try:
+        soup = BeautifulSoup(card_body, "html.parser")
+    except Exception:
+        return card_body
+
+    root = soup.find(True)
+    if not root:
+        return card_body
+
+    card_decl = _bucket_to_decl_string(extracted_recs_styles.get("card"), "card")
+    _set_inline_style(root, card_decl)
+    _set_inline_style(root, _CARD_NODE_FALLBACK)
+
+    title_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_title"), "card_title")
+    if title_decl:
+        title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6"]) or soup.find(["b", "strong"])
+        if title_tag:
+            _set_inline_style(title_tag, title_decl)
+
+    text_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_text"), "card_text")
+    if text_decl:
+        for p in soup.find_all("p"):
+            _set_inline_style(p, text_decl)
+
+    image_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_image"), "card_image")
+    if image_decl:
+        for img in soup.find_all("img"):
+            _set_inline_style(img, image_decl)
+
+    link_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_link"), "card_link")
+    if link_decl:
+        for a in soup.find_all("a"):
+            _set_inline_style(a, link_decl)
+
+    return str(soup)
+
+
 _POSITIONING_PROPS = {"position", "left", "top", "right", "bottom", "transform", "z-index"}
 
 
@@ -1418,6 +1557,7 @@ def generate_recs():
     page_url = (data.get("pageUrl") or "").strip()
     card_html = data.get("cardHtml") or ""
     card_selector = (data.get("cardSelector") or "").strip()
+    container_outer_html = data.get("containerOuterHtml") or ""
     extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
 
     if not page_url:
@@ -1455,8 +1595,9 @@ def generate_recs():
     card_body = inline_extracted_styles(card_body, extracted_styles)
     card_body = sanitize_recs_output(card_body)
     card_body = reattach_outer_wrapper(card_body, card_html)
+    card_body = stamp_extracted_tokens(card_body, extracted_styles)
 
-    full_template = wrap_recs_card(card_body)
+    full_template = wrap_recs_card(card_body, container_outer_html)
     return jsonify(recsTemplate=full_template, cardBody=card_body)
 
 
@@ -1464,6 +1605,7 @@ def generate_recs():
 def regenerate_recs():
     data = request.get_json(silent=True) or {}
     card_html = data.get("cardHtml") or ""
+    container_outer_html = data.get("containerOuterHtml") or ""
     extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
     previous_card_body = data.get("previousCardBody") or ""
     issues = data.get("issues") or []
@@ -1516,8 +1658,9 @@ def regenerate_recs():
     card_body = inline_extracted_styles(card_body, extracted_styles)
     card_body = sanitize_recs_output(card_body)
     card_body = reattach_outer_wrapper(card_body, card_html)
+    card_body = stamp_extracted_tokens(card_body, extracted_styles)
 
-    full_template = wrap_recs_card(card_body)
+    full_template = wrap_recs_card(card_body, container_outer_html)
     return jsonify(recsTemplate=full_template, cardBody=card_body)
 
 

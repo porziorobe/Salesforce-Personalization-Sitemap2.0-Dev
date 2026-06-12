@@ -52,6 +52,7 @@
   var extractedRecsStyles = null;
   var recsCardBody = '';
   var recsAvailable = false;
+  var recsContainerOuterHtml = '';
 
   var artifacts = {
     sitemap: { value: '', state: 'empty', label: 'Sitemap JS' },
@@ -188,6 +189,7 @@
       recContainerSelectorInput.value = recs.containerSelector;
       recCardSelectorInput.value = recs.cardSelector;
       recHtmlInput.value = recs.exemplarOuterHtml || '';
+      recsContainerOuterHtml = recs.containerOuterHtml || '';
       recManualToggle.checked = false;
       setRecEditable(false);
       recsAvailable = true;
@@ -196,6 +198,7 @@
       recContainerSelectorInput.value = '';
       recCardSelectorInput.value = '';
       recHtmlInput.value = '';
+      recsContainerOuterHtml = '';
       recManualToggle.checked = false;
       setRecEditable(false);
       recsAvailable = false;
@@ -381,6 +384,7 @@
           pageUrl: pageUrl,
           cardSelector: cardSelector,
           cardHtml: cardHtml,
+          containerOuterHtml: recsContainerOuterHtml,
           extractedStyles: extractedRecsStyles,
         }),
       });
@@ -429,6 +433,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cardHtml: recHtmlInput.value,
+          containerOuterHtml: recsContainerOuterHtml,
           extractedStyles: extractedRecsStyles,
           previousCardBody: recsCardBody,
           issues: issues,
