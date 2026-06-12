@@ -639,7 +639,10 @@
   targetSelectorInput.addEventListener('input', refreshSectionButtons);
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
-  recManualToggle.addEventListener('change', function () { setRecEditable(this.checked); });
+  recManualToggle.addEventListener('change', function () {
+    setRecEditable(this.checked);
+    if (this.checked) recsContainerOuterHtml = '';
+  });
   recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
   recCardSelectorInput.addEventListener('input', refreshSectionButtons);
   recHtmlInput.addEventListener('input', refreshSectionButtons);
