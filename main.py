@@ -1241,6 +1241,25 @@ _SUBVAR_IF_BLOCK = re.compile(
 )
 
 
+_POSITIONING_PROPS = {"position", "left", "top", "right", "bottom", "transform", "z-index"}
+
+
+def _strip_positioning_styles(style_str):
+    """Remove JS-positioning artifacts (e.g. carousel `left: 0px`) from an inline style string."""
+    if not style_str:
+        return ""
+    kept = []
+    for decl in style_str.split(";"):
+        decl = decl.strip()
+        if not decl or ":" not in decl:
+            continue
+        prop, _ = decl.split(":", 1)
+        if prop.strip().lower() in _POSITIONING_PROPS:
+            continue
+        kept.append(decl)
+    return "; ".join(kept)
+
+
 def reattach_outer_wrapper(card_body, original_card_html):
     """
     Ensure the LLM-generated card body is wrapped in the customer's outermost
@@ -1274,7 +1293,7 @@ def reattach_outer_wrapper(card_body, original_card_html):
     classes = orig_root.get("class")
     if classes:
         attrs.append(f'class="{" ".join(classes)}"')
-    style = orig_root.get("style")
+    style = _strip_positioning_styles(orig_root.get("style"))
     if style:
         attrs.append(f'style="{style}"')
     elem_id = orig_root.get("id")
