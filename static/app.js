@@ -9,7 +9,6 @@
   var recContainerSelectorInput = document.getElementById('rec-container-selector');
   var recCardSelectorInput = document.getElementById('rec-card-selector');
   var recHtmlInput = document.getElementById('rec-html');
-  var recManualToggle = document.getElementById('rec-manual-toggle');
   var recStatusNote = document.getElementById('rec-status-note');
 
   var generateSitemapBtn = document.getElementById('generate-sitemap-btn');
@@ -89,13 +88,7 @@
     targetHtmlInput.readOnly = !editable;
   }
 
-  function setRecEditable(editable) {
-    recContainerSelectorInput.readOnly = !editable;
-    recCardSelectorInput.readOnly = !editable;
-    recHtmlInput.readOnly = !editable;
-  }
-
-  function setRecStatus(message) {
+function setRecStatus(message) {
     if (!message) {
       recStatusNote.hidden = true;
       recStatusNote.textContent = '';
@@ -190,8 +183,6 @@
       recCardSelectorInput.value = recs.cardSelector;
       recHtmlInput.value = recs.exemplarOuterHtml || '';
       recsContainerOuterHtml = recs.containerOuterHtml || '';
-      recManualToggle.checked = false;
-      setRecEditable(false);
       recsAvailable = true;
       setRecStatus('');
     } else {
@@ -199,10 +190,8 @@
       recCardSelectorInput.value = '';
       recHtmlInput.value = '';
       recsContainerOuterHtml = '';
-      recManualToggle.checked = false;
-      setRecEditable(false);
       recsAvailable = false;
-      setRecStatus('No recommendations section detected — branded LLM gen skipped. The static placeholder template is still available via Generate.');
+      setRecStatus('No recommendations section detected — fill in the fields below and Generate will use your input.');
     }
   }
 
@@ -228,8 +217,6 @@
         manualToggle.checked = true;
         setEditable(true);
         applyRecsResult(null);
-        recManualToggle.checked = true;
-        setRecEditable(true);
         refreshSectionButtons();
         return;
       }
@@ -258,8 +245,6 @@
       manualToggle.checked = true;
       setEditable(true);
       applyRecsResult(null);
-      recManualToggle.checked = true;
-      setRecEditable(true);
       refreshSectionButtons();
     } finally {
       setBtnLoading(detectBtn, false);
@@ -356,7 +341,7 @@
     var cardSelector = recCardSelectorInput.value.trim();
     var cardHtml = recHtmlInput.value;
 
-    var canRunLLM = recsAvailable && pageUrl && cardSelector && cardHtml.trim();
+    var canRunLLM = pageUrl && cardSelector && cardHtml.trim();
 
     try {
       if (!canRunLLM) {
@@ -639,11 +624,7 @@
   targetSelectorInput.addEventListener('input', refreshSectionButtons);
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
-  recManualToggle.addEventListener('change', function () {
-    setRecEditable(this.checked);
-    if (this.checked) recsContainerOuterHtml = '';
-  });
-  recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
+recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
   recCardSelectorInput.addEventListener('input', refreshSectionButtons);
   recHtmlInput.addEventListener('input', refreshSectionButtons);
 
