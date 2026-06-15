@@ -89,6 +89,9 @@ html { scroll-behavior: smooth; }
 .history-btn { font-family: var(--font-stack); font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: var(--sf-radius); border: 1px solid var(--sf-border-strong); cursor: pointer; background: var(--sf-surface); color: var(--sf-blue); }
 .history-btn:hover { background: #eaf5fe; }
 .history-btn--delete { color: var(--sf-text-placeholder); }
+.history-pills { display: flex; gap: 0.3rem; }
+.history-pill { font-size: 0.6875rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 999px; border: 1px solid var(--sf-border); color: var(--sf-text-placeholder); background: #f4f4f4; }
+.history-pill--active { background: #e6f7ec; border-color: #b3e2c2; color: #036c3a; }
 .history-btn--delete:hover { color: var(--sf-error-border); background: var(--sf-error-bg); border-color: var(--sf-error-border); }
 @media (max-width: 1180px) { .history-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 880px) { .history-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
