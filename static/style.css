@@ -151,8 +151,9 @@ body.modal-open { overflow: hidden; }
 .modal-tab.is-active { color: var(--sf-blue-dark); border-bottom-color: var(--sf-blue-dark); font-weight: 600; }
 .modal-tab-panel[hidden] { display: none; }
 
-.schema-guide-link { background: none; border: none; padding: 0; font-family: var(--font-stack); font-size: 0.8rem; font-weight: 600; color: var(--sf-blue); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-.schema-guide-link:hover { color: var(--sf-blue-dark); }
+.schema-guide-link { background: none; border: none; padding: 0; font-family: var(--font-stack); font-size: 0.8rem; font-weight: 600; color: var(--sf-blue); cursor: pointer; text-decoration: none; }
+.schema-guide-link:hover { color: var(--sf-blue-dark); text-decoration: underline; }
+.schema-guide-callout { font-size: 0.8rem; color: var(--sf-text-placeholder); }
 
 .schema-guide-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 1rem; }
 .schema-guide-table th { text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--sf-text-secondary); padding: 0.4rem 0.75rem; border-bottom: 2px solid var(--sf-border); }
