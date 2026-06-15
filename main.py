@@ -1627,7 +1627,6 @@ def generate_recs():
     data = request.get_json(silent=True) or {}
     page_url = (data.get("pageUrl") or "").strip()
     card_html = data.get("cardHtml") or ""
-    card_selector = (data.get("cardSelector") or "").strip()
     container_html = data.get("containerHtml") or ""
     extracted_styles = data.get("extractedStyles") or DEFAULT_RECS_STYLES
 
@@ -1635,8 +1634,6 @@ def generate_recs():
         return jsonify(error="pageUrl is required."), 400
     if not card_html.strip():
         return jsonify(error="cardHtml is required."), 400
-    if not card_selector:
-        return jsonify(error="cardSelector is required."), 400
     if not container_html.strip():
         return jsonify(error="containerHtml is required."), 400
 

@@ -6,7 +6,6 @@
   var targetSelectorInput = document.getElementById('target-selector');
   var targetHtmlInput = document.getElementById('target-html');
   var recContainerSelectorInput = document.getElementById('rec-container-selector');
-  var recCardSelectorInput = document.getElementById('rec-card-selector');
   var recContainerHtmlInput = document.getElementById('rec-container-html');
   var recHtmlInput = document.getElementById('rec-html');
   var recStatusNote = document.getElementById('rec-status-note');
@@ -100,7 +99,6 @@ function setRecStatus(message) {
 
   function recsInputsReady() {
     return recContainerSelectorInput.value.trim()
-      && recCardSelectorInput.value.trim()
       && recContainerHtmlInput.value.trim()
       && recHtmlInput.value.trim();
   }
@@ -171,14 +169,12 @@ function setRecStatus(message) {
   function applyRecsResult(recs) {
     if (recs && recs.containerSelector && recs.cardSelector) {
       recContainerSelectorInput.value = recs.containerSelector;
-      recCardSelectorInput.value = recs.cardSelector;
       recContainerHtmlInput.value = recs.containerOuterHtml || '';
       recHtmlInput.value = recs.exemplarOuterHtml || '';
       recsAvailable = true;
       setRecStatus('');
     } else {
       recContainerSelectorInput.value = '';
-      recCardSelectorInput.value = '';
       recContainerHtmlInput.value = '';
       recHtmlInput.value = '';
       recsAvailable = false;
@@ -220,7 +216,7 @@ function setRecStatus(message) {
         await extractHeroAndRecsStyles(
           pageUrl,
           targetSelectorInput.value.trim(),
-          recsAvailable ? recCardSelectorInput.value.trim() : null
+          recsAvailable ? recContainerSelectorInput.value.trim() : null
         );
       } catch (extractErr) {
         showError(extractErr.message || 'Style extraction failed.');
@@ -354,7 +350,6 @@ function setRecStatus(message) {
     setBtnLoading(generateRecBtn, true);
 
     var pageUrl = pageUrlInput.value.trim();
-    var cardSelector = recCardSelectorInput.value.trim();
     var containerHtml = recContainerHtmlInput.value;
     var cardHtml = recHtmlInput.value;
 
@@ -364,7 +359,6 @@ function setRecStatus(message) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageUrl: pageUrl,
-          cardSelector: cardSelector,
           containerHtml: containerHtml,
           cardHtml: cardHtml,
           extractedStyles: extractedRecsStyles,
@@ -627,7 +621,6 @@ function setRecStatus(message) {
   targetHtmlInput.addEventListener('input', refreshSectionButtons);
 
   recContainerSelectorInput.addEventListener('input', refreshSectionButtons);
-  recCardSelectorInput.addEventListener('input', refreshSectionButtons);
   recContainerHtmlInput.addEventListener('input', refreshSectionButtons);
   recHtmlInput.addEventListener('input', refreshSectionButtons);
 
