@@ -671,15 +671,23 @@ function setRecStatus(message) {
 
   function addHistoryEntry(url, partial) {
     var entries = getHistory();
-    entries.unshift({
-      id: String(Date.now()),
-      brand: deriveBrand(url),
-      url: url,
-      timestamp: Date.now(),
-      sitemap: partial.sitemap || '',
-      heroTemplate: partial.heroTemplate || '',
-      recTemplate: partial.recTemplate || '',
-    });
+    var top = entries[0];
+    if (top && top.url === url) {
+      if (partial.sitemap) top.sitemap = partial.sitemap;
+      if (partial.heroTemplate) top.heroTemplate = partial.heroTemplate;
+      if (partial.recTemplate) top.recTemplate = partial.recTemplate;
+      top.timestamp = Date.now();
+    } else {
+      entries.unshift({
+        id: String(Date.now()),
+        brand: deriveBrand(url),
+        url: url,
+        timestamp: Date.now(),
+        sitemap: partial.sitemap || '',
+        heroTemplate: partial.heroTemplate || '',
+        recTemplate: partial.recTemplate || '',
+      });
+    }
     saveHistory(entries);
     renderHistory();
   }
