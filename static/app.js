@@ -709,9 +709,10 @@ function setRecStatus(message) {
 
     historyList.innerHTML = entries.map(function (entry) {
       function pill(label, active) {
-        return '<span class="history-pill' + (active ? ' history-pill--active' : '') + '">' + label + '</span>';
+        return '<span class="history-pill' + (active ? ' history-pill--active' : '') + '">' + (active ? '✓ ' : '') + label + '</span>';
       }
       return '<div class="history-card" data-id="' + entry.id + '">'
+        + '<div class="history-card-top">'
         + '<div class="history-card-info">'
         + '<span class="history-brand" title="' + entry.brand + '">' + entry.brand + '</span>'
         + '<span class="history-url" title="' + entry.url + '">' + entry.url + '</span>'
@@ -721,6 +722,7 @@ function setRecStatus(message) {
         + pill('Sitemap', !!entry.sitemap)
         + pill('Hero', !!entry.heroTemplate)
         + pill('Recs', !!entry.recTemplate)
+        + '</div>'
         + '</div>'
         + '<div class="history-actions">'
         + '<button type="button" class="history-btn history-btn--load">Load</button>'
