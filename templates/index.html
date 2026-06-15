@@ -108,6 +108,7 @@
                 <span class="status-text">Not generated</span>
               </span>
             </div>
+            <button type="button" class="schema-guide-link" data-schema="hero">Content Schema Guide</button>
             <div class="artifact-actions">
               <button type="button" id="generate-hero-btn" class="btn btn-primary" disabled>
                 <span class="btn-label">Generate</span>
@@ -128,6 +129,7 @@
                 <span class="status-text">Not generated</span>
               </span>
             </div>
+            <button type="button" class="schema-guide-link" data-schema="recs">Content Schema Guide</button>
             <div class="artifact-actions">
               <button type="button" id="generate-rec-btn" class="btn btn-primary" disabled>
                 <span class="btn-label">Generate</span>
@@ -198,6 +200,23 @@
             <span class="btn-label">Regenerate</span>
             <span class="btn-loading" hidden aria-hidden="true">Regenerating...</span>
           </button>
+        </footer>
+      </div>
+    </div>
+
+    <div id="schema-guide-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="schema-guide-heading">
+      <div class="modal-backdrop" data-close-schema-modal></div>
+      <div class="modal-content">
+        <header class="modal-header">
+          <h3 id="schema-guide-heading">Content Schema Guide</h3>
+          <button type="button" class="modal-close" data-close-schema-modal aria-label="Close">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="modal-intro">The Content Schema maps your Experience Template variables to Salesforce Personalization data. When setting up your template in WPM, use the fields below to ensure each variable is correctly wired to the right data source.</p>
+          <div id="schema-guide-content"></div>
+        </div>
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-neutral" data-close-schema-modal>Close</button>
         </footer>
       </div>
     </div>

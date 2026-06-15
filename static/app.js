@@ -748,4 +748,62 @@ function setRecStatus(message) {
   });
 
   renderHistory();
+
+  var schemaGuideModal = document.getElementById('schema-guide-modal');
+  var schemaGuideContent = document.getElementById('schema-guide-content');
+
+  var SCHEMA_DATA = {
+    hero: {
+      schema: 'Simple Hero',
+      variables: [
+        { label: 'BackgroundImageUrl', api: 'BackgroundImageUrl', default: 'Attributes > BackgroundImageUrl' },
+        { label: 'Header',             api: 'Header',             default: 'Attributes > Header' },
+        { label: 'Subheader',          api: 'Subheader',          default: 'Attributes > Subheader' },
+        { label: 'CallToActionText',   api: 'CallToActionText',   default: 'Attributes > CallToActionText' },
+        { label: 'CallToActionUrl',    api: 'CallToActionUrl',    default: 'Attributes > CallToActionUrl' },
+      ]
+    },
+    recs: {
+      schema: 'Recommendations - Goods Product',
+      variables: [
+        { label: 'image',   api: 'image',   default: 'Goods Product > ImageUrl' },
+        { label: 'name',    api: 'name',    default: 'Goods Product > Product Name' },
+        { label: 'linkUrl', api: 'linkUrl', default: 'Goods Product > LinkURL' },
+      ]
+    }
+  };
+
+  function openSchemaGuide(type) {
+    var data = SCHEMA_DATA[type];
+    if (!data) return;
+    var rows = data.variables.map(function (v) {
+      return '<tr><td><code>' + v.label + '</code></td><td><code>' + v.api + '</code></td><td>' + v.default + '</td></tr>';
+    }).join('');
+    schemaGuideContent.innerHTML =
+      '<p class="schema-guide-schema">Content Schema: <strong>' + data.schema + '</strong></p>'
+      + '<table class="schema-guide-table">'
+      + '<thead><tr><th>Label</th><th>API Name</th><th>Default Value</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table>';
+    schemaGuideModal.hidden = false;
+    document.body.classList.add('modal-open');
+  }
+
+  function closeSchemaGuide() {
+    schemaGuideModal.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  document.querySelectorAll('.schema-guide-link').forEach(function (btn) {
+    btn.addEventListener('click', function () { openSchemaGuide(btn.dataset.schema); });
+  });
+
+  schemaGuideModal.addEventListener('click', function (e) {
+    if (e.target.hasAttribute('data-close-schema-modal')) closeSchemaGuide();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !schemaGuideModal.hidden) closeSchemaGuide();
+  });
+
 })();
