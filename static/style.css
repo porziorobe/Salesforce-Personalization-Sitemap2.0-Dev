@@ -91,7 +91,7 @@ html { scroll-behavior: smooth; }
 .history-btn--delete { color: var(--sf-text-placeholder); }
 .history-card-top { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
 .history-card-info { flex: 1; min-width: 0; }
-.history-pills { display: flex; gap: 0.3rem; flex-shrink: 0; align-items: flex-start; padding-top: 0.1rem; }
+.history-pills { display: flex; flex-direction: column; gap: 0.2rem; flex-shrink: 0; align-items: flex-end; padding-top: 0.1rem; }
 .history-pill { font-size: 0.6875rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 999px; border: 1px solid var(--sf-border); color: var(--sf-text-placeholder); background: #f4f4f4; }
 .history-pill--active { background: var(--sf-surface); border-color: var(--sf-text-secondary); color: var(--sf-text); }
 .history-btn--delete:hover { color: var(--sf-error-border); background: var(--sf-error-bg); border-color: var(--sf-error-border); }
