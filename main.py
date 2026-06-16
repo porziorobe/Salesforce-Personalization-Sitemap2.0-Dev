@@ -24,7 +24,7 @@ llm = ConnectAPILLM(
     authenticator=authenticator,
     provider="OpenAI",
     model="sfdc_ai__DefaultOpenAIGPT4OmniMini",
-    temperature=0.5,
+    temperature=0.1,
 )
 
 app = Flask(__name__)
@@ -432,7 +432,10 @@ Rules:
 
 3. STRIP REMAINING NOISE.
    Remove any leftover video, audio, modal, script, or interactive elements.
-   Remove empty wrapper divs that serve no structural purpose.
+   NEVER remove wrapper or container elements — even if they appear structural-only.
+   NEVER remove any element that carries inline styles. Those styles are load-bearing
+   visual identity; stripping them destroys the customer's design.
+   When in doubt, keep the element and replace only its content with subVars.
 
 4. INLINE STYLES — use sparingly.
    Keep inline styles that already exist in TARGET_HTML. Add inline styles
@@ -576,6 +579,8 @@ Rules:
 8. STRIP REMAINING NOISE.
    Remove video, audio, modal, script, popup, and interactive elements not part of
    the card's link or CTA. Remove empty wrapper divs that result from rule 7.
+   NEVER remove elements that carry inline styles. Those styles are load-bearing
+   visual identity. NEVER remove structural wrapper or container elements.
 
 9. INLINE STYLES - use sparingly on card elements.
    Keep inline styles already in CARD_HTML. Add inline styles only where essential.
