@@ -20,12 +20,7 @@ from llm_provider import ConnectAPILLM
 cssutils.log.setLevel(logging.CRITICAL)
 
 authenticator = ConnectedAppAuth(creds_file="creds.json")
-llm = ConnectAPILLM(
-    authenticator=authenticator,
-    provider="OpenAI",
-    model="sfdc_ai__DefaultOpenAIGPT4OmniMini",
-    temperature=0.1,
-)
+llm = ConnectAPILLM(authenticator=authenticator)
 
 app = Flask(__name__)
 
@@ -187,211 +182,6 @@ def assemble_sitemap_v2(hero_selector, card_selector):
         .replace("{{HERO_SELECTOR}}", hero_selector)
         .replace("{{CARD_SELECTOR}}", card_selector or "BODY_CARDS_SELECTOR")
     )
-
-
-SITEMAP_TEMPLATE = r"""//SimpleSitemap
-SalesforceInteractions.setLoggingLevel(100);
-SalesforceInteractions.updateConsents({
-    purpose: SalesforceInteractions.ConsentPurpose.Tracking,
-    provider: "Example Consent Manager",
-    status: SalesforceInteractions.ConsentStatus.OptIn
-});
-
-document.addEventListener(
-    SalesforceInteractions.CustomEvents.OnSetAnonymousId, () => {
-        SalesforceInteractions.sendEvent({
-            user: { attributes: { eventType: 'identity' } }
-        })
-    }
-);
-
-document.querySelector('html').style.fontSize = '14px';
-SalesforceInteractions.Personalization.Config.initialize({
-    additionalTransformers: [{
-        name: "{{CUSTOMER_NAME}}_Homepage_Hero_Banner",
-        transformerType: "Handlebars",
-        lastModifiedDate: new Date().getTime() - (1000 * 60 * 5),
-        substitutionDefinitions: {
-            BackgroundImageUrl: { defaultValue: '[attributes].[BackgroundImageUrl]' },
-            Header: { defaultValue: '[attributes].[Header]' },
-            Subheader: { defaultValue: '[attributes].[Subheader]' },
-            CallToActionUrl: { defaultValue: '[attributes].[CallToActionUrl]' },
-            CallToActionText: { defaultValue: '[attributes].[CallToActionText]' }
-        },
-        transformerTypeDetails: {
-            html: `{{HERO_TRANSFORMER_HTML}}`
-        }
-    }{{SIMPLE_RECS_TRANSFORMER}}
-    ]
-});
-
-/* ===================== SITEMAP ===================== */
-console.log("PSP: Hello world from Data Cloud");
-SalesforceInteractions.setLoggingLevel(100);
-SalesforceInteractions.updateConsents({
-    purpose: SalesforceInteractions.ConsentPurpose.Tracking,
-    provider: "Example Consent Manager",
-    status: SalesforceInteractions.ConsentStatus.OptIn
-});
-
-document.addEventListener(
-    SalesforceInteractions.CustomEvents.OnSetAnonymousId, () => {
-        SalesforceInteractions.sendEvent({
-            user: { attributes: { eventType: 'identity', isAnonymous: 1 } }
-        })
-    }
-);
-
-function getMetaTag(tagName){
-    var metaTags = document.getElementsByTagName("META");
-    var metaTagContent = "";
-    for (var i = 0; i < metaTags.length; i++) {
-        if(metaTags[i].name == tagName){
-            metaTagContent = metaTags[i].getAttribute('content');
-        }
-    }
-    return metaTagContent;
-}
-
-SalesforceInteractions.init().then(() => {
-    const config = {
-        global: { onActionEvent: (event) => { return event; } },
-        pageTypes: [{
-            name: "Homepage",
-            isMatch: () => window.location.pathname === '/',
-            interaction: { name: "Homepage", eventType: "browse", pageType: "Homepage" },
-            onActionEvent: (event) => {
-                if (event.interaction.name == "Homepage") {
-                    SalesforceInteractions.Personalization
-                        .fetch(["{{CUSTOMER_NAME}}_Homepage_Hero_Banner"])
-                        .then(r => renderBannerHeader(r.personalizations[0].attributes))
-                }
-                return event;
-            },
-            contentZones: [
-                { name: "Homepage | Hero", selector: "{{TARGET_SELECTOR}}" }
-                // { name: "Homepage | Recs", selector: "RECS_SELECTOR" }
-            ]
-        }],
-        pageTypeDefault: { name: "Default" }
-    };
-    SalesforceInteractions.initSitemap(config);
-});"""
-
-
-SIMPLE_RECS_TRANSFORMER_JS = r""",
-    {
-        name: "SimpleRecs",
-        transformerType: "Handlebars",
-        lastModifiedDate: new Date().getTime() - (1000 * 60 * 60 * 36),
-        substitutionDefinitions: {
-            recs: { defaultValue: '[data]' },
-            image: { defaultValue: '[ImageUrl__c]' },
-            name: { defaultValue: '[ssot__Name__c]' },
-            linkUrl: { defaultValue: '[LinkURL__c]' }
-        },
-        transformerTypeDetails: {
-            html: `
-            <style>
-                .sfdcep-recs-carousel {
-                    width: 100%;
-                    max-width: 1440px;
-                    margin: 0 auto;
-                    display: flex;
-                    flex-flow: row wrap;
-                    justify-content: space-evenly;
-                    padding: 20px 0;
-                    gap: 20px;
-                }
-                .sfdcep-recs-card-wrapper {
-                    width: 22%;
-                    min-width: 240px;
-                    flex: 1 1 240px;
-                }
-                .sfdcep-recs-card {
-                    height: 100%;
-                    background: #fff;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    box-shadow: 0 2px 12px rgba(0,0,0,0.10);
-                    display: flex;
-                    flex-direction: column;
-                }
-                .sfdcep-recs-card .cmp-image__image {
-                    width: 100%;
-                    height: 200px;
-                    object-fit: cover;
-                    display: block;
-                }
-                .sfdcep-recs-card__content {
-                    padding: 20px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                    flex: 1;
-                }
-                .sfdcep-recs-card__title {
-                    font-size: 18px;
-                    font-weight: 600;
-                    color: #1d1d1d;
-                    margin: 0;
-                    font-family: Arial, Helvetica, sans-serif;
-                }
-                .sfdcep-recs-card__cta {
-                    color: #097fb3;
-                    font-size: 14px;
-                    text-decoration: none;
-                    font-weight: 500;
-                    font-family: Arial, Helvetica, sans-serif;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 4px;
-                    margin-top: auto;
-                }
-                .sfdcep-recs-card__cta:hover {
-                    text-decoration: underline;
-                }
-            </style>
-            <div class="sfdcep-recs-carousel">
-                {{#each (subVar 'recs')}}
-                <div class="sfdcep-recs-card-wrapper">
-                    <div class="sfdcep-recs-card">
-                        <div class="cmp-teaser__image">
-                            {{#if (subVar 'image')}}
-                                <img src="{{subVar 'image'}}" class="cmp-image__image" alt="{{subVar 'name'}}">
-                            {{else}}
-                                <img src="https://placehold.co/750x422/e8f4fb/097fb3?text=No+Image" class="cmp-image__image" alt="">
-                            {{/if}}
-                        </div>
-                        <div class="sfdcep-recs-card__content">
-                            <h3 class="sfdcep-recs-card__title">{{subVar 'name'}}</h3>
-                            <a class="sfdcep-recs-card__cta" href="{{subVar 'linkUrl'}}" target="_self">Learn More</a>
-                        </div>
-                    </div>
-                </div>
-                {{/each}}
-            </div>
-                `
-        }
-    }"""
-
-
-def assemble_sitemap(customer_name, target_selector, hero_html, include_recs=True):
-    """Build the complete sitemap JS from the template and LLM-generated hero HTML."""
-    recs_block = SIMPLE_RECS_TRANSFORMER_JS if include_recs else ""
-    return (
-        SITEMAP_TEMPLATE
-        .replace("{{CUSTOMER_NAME}}", customer_name)
-        .replace("{{TARGET_SELECTOR}}", target_selector)
-        .replace("{{HERO_TRANSFORMER_HTML}}", hero_html)
-        .replace("{{SIMPLE_RECS_TRANSFORMER}}", recs_block)
-    )
-
-
-def extract_transformer_html(sitemap_js):
-    """Extract the hero transformer HTML from a previously generated sitemap."""
-    m = re.search(r"transformerTypeDetails:\s*\{\s*html:\s*`(.*?)`", sitemap_js, re.DOTALL)
-    return m.group(1).strip() if m else ""
 
 
 LLM_PROMPT = """You are an expert at adapting website HTML into Salesforce Personalization Handlebars transformers.
@@ -664,66 +454,6 @@ RULES:
 Output ONLY the corrected complete template. No JavaScript, no boilerplate, no markdown fences, no commentary."""
 
 
-_FALLBACK_CONTAINER_STYLE = (
-    "display:flex;flex-flow:row wrap;justify-content:space-evenly;"
-    "gap:20px;padding:20px 0;width:100%;max-width:1440px;margin:0 auto"
-)
-
-
-def _merge_inline_style(existing, additions):
-    """Merge a new inline-style declaration into an existing one without overriding existing keys."""
-    existing_keys = set()
-    if existing:
-        for decl in existing.split(";"):
-            decl = decl.strip()
-            if decl and ":" in decl:
-                existing_keys.add(decl.split(":", 1)[0].strip().lower())
-    add_decls = []
-    for decl in additions.split(";"):
-        decl = decl.strip()
-        if not decl or ":" not in decl:
-            continue
-        key = decl.split(":", 1)[0].strip().lower()
-        if key not in existing_keys:
-            add_decls.append(decl)
-    if not add_decls:
-        return existing or ""
-    base = (existing or "").rstrip(";").strip()
-    return (base + ("; " if base else "") + "; ".join(add_decls)).strip()
-
-
-def wrap_recs_card(card_body, container_outer_html=None):
-    """
-    Wrap an LLM-generated per-card body using the customer's captured container
-    when available; fall back to a minimal generic flex shell otherwise. Either
-    way, stamp live inline geometry so layout never depends on customer CSS
-    binding inside the iframe.
-    """
-    each_block = "{{#each (subVar 'recs')}}\n" + card_body + "\n{{/each}}"
-
-    if container_outer_html:
-        try:
-            soup = BeautifulSoup(container_outer_html, "html.parser")
-            container = soup.find(True)
-        except Exception:
-            container = None
-
-        if container:
-            container.clear()
-            existing_style = container.get("style", "")
-            container["style"] = _merge_inline_style(existing_style, _FALLBACK_CONTAINER_STYLE)
-            placeholder = "{{__RECS_EACH__}}"
-            container.append(placeholder)
-            rendered = str(container).replace(placeholder, each_block)
-            return rendered
-
-    return (
-        f'<div style="{_FALLBACK_CONTAINER_STYLE}">\n'
-        f"{each_block}\n"
-        "</div>"
-    )
-
-
 def fetch_page(url):
     resp = requests.get(url, headers={"User-Agent": BROWSER_UA, "Accept": "text/html"}, timeout=25, allow_redirects=True)
     resp.raise_for_status()
@@ -740,12 +470,19 @@ def best_selector(tag):
 
 
 def detect_hero(soup):
-    candidates = soup.body.find_all(["section", "div"], limit=80) if soup.body else []
+    candidates = soup.body.find_all(["section", "div"], limit=200) if soup.body else []
 
+    # Pass 1: background-image with text content — prefer elements that carry both.
+    first_bg = None
     for el in candidates:
         style = el.get("style", "")
         if re.search(r"background(-image)?\s*:", style, re.I):
-            return el
+            if first_bg is None:
+                first_bg = el
+            if el.find(["h1", "h2"]) or el.find("a"):
+                return el
+    if first_bg is not None:
+        return first_bg
 
     for el in candidates:
         cls = " ".join(el.get("class", []))
@@ -793,6 +530,24 @@ def _score_repeating_container(container):
     return None
 
 
+NAV_SIGNALS = re.compile(r"\b(nav|menu|navigation|header)\b", re.I)
+
+
+def _is_nav_container(el):
+    if el.name in ("nav", "header"):
+        return True
+    cls_id = " ".join(el.get("class", [])) + " " + (el.get("id") or "")
+    if NAV_SIGNALS.search(cls_id):
+        return True
+    for ancestor in el.parents:
+        if ancestor.name in ("nav", "header"):
+            return True
+        anc_cls = " ".join(ancestor.get("class", []))
+        if NAV_SIGNALS.search(anc_cls):
+            return True
+    return False
+
+
 def detect_recs(soup):
     """
     Find a repeating product/card grid. Returns dict with container_selector,
@@ -805,6 +560,8 @@ def detect_recs(soup):
 
     # Pass 1: structural signal — 3+ similar children with img + link/heading.
     for container in containers:
+        if _is_nav_container(container):
+            continue
         result = _score_repeating_container(container)
         if result:
             _sig, exemplar = result
@@ -817,6 +574,8 @@ def detect_recs(soup):
 
     # Pass 2: keyword + image structure.
     for container in containers:
+        if _is_nav_container(container):
+            continue
         cls_id = " ".join(container.get("class", [])) + " " + (container.get("id") or "")
         if not RECS_KEYWORDS.search(cls_id):
             continue
@@ -899,6 +658,72 @@ RECS_NOISE_TAGS = {
     "video", "audio", "track",
 }
 
+CAROUSEL_SLIDE_CLASSES = {
+    "swiper-slide",
+    "slick-slide",
+    "owl-item",
+    "flickity-cell",
+    "splide__slide",
+    "glide__slide",
+    "carousel-item",
+    "cycle-slide",
+    "tns-item",
+}
+
+CAROUSEL_OUTER_CLASSES = {
+    "swiper",
+    "swiper-initialized",
+    "swiper-container",
+    "swiper-container-initialized",
+    "slick-slider",
+    "slick-initialized",
+    "owl-carousel",
+    "flickity-enabled",
+    "splide",
+    "glide",
+    "carousel",
+}
+
+CAROUSEL_TRACK_CLASSES = {
+    "swiper-wrapper",
+    "swiper-container",
+    "slick-track",
+    "slick-list",
+    "owl-stage",
+    "owl-stage-outer",
+    "flickity-viewport",
+    "flickity-slider",
+    "splide__list",
+    "glide__slides",
+    "embla__container",
+    "tns-inner",
+    "tns-ovh",
+    "carousel-inner",
+}
+
+CAROUSEL_CHROME_CLASSES = {
+    "swiper-pagination",
+    "swiper-button-next",
+    "swiper-button-prev",
+    "swiper-notification",
+    "swiper-scrollbar",
+    "slick-dots",
+    "slick-arrow",
+    "slick-prev",
+    "slick-next",
+    "owl-nav",
+    "owl-dots",
+    "flickity-page-dots",
+    "flickity-prev-next-button",
+    "splide__arrows",
+    "splide__pagination",
+    "glide__arrows",
+    "glide__bullets",
+    "carousel-indicators",
+    "carousel-control-prev",
+    "carousel-control-next",
+}
+
 
 def _sanitize(raw_html, noise_tags):
     soup = BeautifulSoup(raw_html, "html.parser")
@@ -923,14 +748,102 @@ def _sanitize(raw_html, noise_tags):
     return str(soup).strip()
 
 
+def _strip_carousel_chrome(soup):
+    """Remove carousel navigation/pagination elements entirely."""
+    for tag in list(soup.find_all(True)):
+        if not tag.parent:
+            continue
+        tag_classes = set(tag.get("class", []))
+        if tag_classes & CAROUSEL_CHROME_CLASSES:
+            tag.decompose()
+
+
+def _unwrap_carousel_tracks(soup):
+    """Unwrap carousel track/stage wrappers, promoting their children up one level."""
+    for tag in list(soup.find_all(True)):
+        if not tag.parent:
+            continue
+        tag_classes = set(tag.get("class", []))
+        if tag_classes & CAROUSEL_TRACK_CLASSES:
+            tag.unwrap()
+
+
+def _collapse_hero_carousel(soup):
+    """
+    Collapse a hero carousel to a single slide. Detects carousel structure,
+    keeps only the first slide, strips chrome and track/outer wrappers.
+    """
+    _strip_carousel_chrome(soup)
+
+    slides = [
+        tag for tag in soup.find_all(True)
+        if tag.parent and set(tag.get("class", [])) & CAROUSEL_SLIDE_CLASSES
+    ]
+    if len(slides) > 1:
+        for slide in slides[1:]:
+            slide.decompose()
+
+    _unwrap_carousel_tracks(soup)
+
+    for tag in list(soup.find_all(True)):
+        if not tag.parent:
+            continue
+        tag_classes = set(tag.get("class", []))
+        if tag_classes & CAROUSEL_OUTER_CLASSES:
+            tag.unwrap()
+
+
 def sanitize_html(raw_html):
-    """Strip interactive/media noise from TARGET_HTML while preserving structural DOM."""
-    return _sanitize(raw_html, NOISE_TAGS)
+    """Strip interactive/media noise from TARGET_HTML, collapse hero carousels."""
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    for tag in list(soup.find_all(NOISE_TAGS)):
+        tag.decompose()
+
+    for comment in list(soup.find_all(string=lambda t: isinstance(t, Comment))):
+        comment.extract()
+
+    _collapse_hero_carousel(soup)
+
+    for tag in list(soup.find_all(True)):
+        if not tag.parent:
+            continue
+        classes = " ".join(tag.get("class", []))
+        if "modal" in classes.lower() or tag.get("aria-hidden") == "true":
+            tag.decompose()
+            continue
+        for attr in list(tag.attrs):
+            if attr.startswith("data-"):
+                del tag[attr]
+
+    return str(soup).strip()
 
 
 def sanitize_card_html(raw_html):
-    """Card sanitizer: keep <picture>/<source> since they often carry the card image."""
-    return _sanitize(raw_html, RECS_NOISE_TAGS)
+    """Card sanitizer: strip carousel chrome, unwrap track wrappers, remove media noise."""
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    for tag in list(soup.find_all(RECS_NOISE_TAGS)):
+        tag.decompose()
+
+    for comment in list(soup.find_all(string=lambda t: isinstance(t, Comment))):
+        comment.extract()
+
+    _strip_carousel_chrome(soup)
+    _unwrap_carousel_tracks(soup)
+
+    for tag in list(soup.find_all(True)):
+        if not tag.parent:
+            continue
+        classes = " ".join(tag.get("class", []))
+        if "modal" in classes.lower() or tag.get("aria-hidden") == "true":
+            tag.decompose()
+            continue
+        for attr in list(tag.attrs):
+            if attr.startswith("data-"):
+                del tag[attr]
+
+    return str(soup).strip()
 
 
 def _usable(val):
@@ -1346,177 +1259,6 @@ _SUBVAR_IF_BLOCK = re.compile(
     r"\{\{/if\}\}",
     re.DOTALL,
 )
-
-
-_CSS_KEY_FOR_BUCKET = {
-    "card": {
-        "backgroundColor": "background-color",
-        "borderRadius": "border-radius",
-        "boxShadow": "box-shadow",
-        "padding": "padding",
-    },
-    "card_image": {
-        "borderRadius": "border-radius",
-        "aspectRatio": "aspect-ratio",
-    },
-    "card_title": {
-        "fontSize": "font-size",
-        "fontWeight": "font-weight",
-        "color": "color",
-    },
-    "card_text": {
-        "fontSize": "font-size",
-        "color": "color",
-    },
-    "card_link": {
-        "color": "color",
-        "textDecoration": "text-decoration",
-        "fontWeight": "font-weight",
-    },
-}
-
-_CARD_NODE_FALLBACK = "min-width:240px;flex:1 1 240px"
-
-
-def _bucket_to_decl_string(bucket_dict, bucket_name):
-    """Convert an extracted bucket (camelCase keys) into a CSS declaration string."""
-    if not bucket_dict:
-        return ""
-    keymap = _CSS_KEY_FOR_BUCKET.get(bucket_name, {})
-    decls = []
-    for cam, css_key in keymap.items():
-        val = bucket_dict.get(cam)
-        if val and val != "auto":
-            decls.append(f"{css_key}:{val}")
-    return ";".join(decls)
-
-
-def _set_inline_style(tag, additions):
-    """Merge additions into a tag's inline style without overwriting existing keys."""
-    if not additions:
-        return
-    merged = _merge_inline_style(tag.get("style", ""), additions)
-    if merged:
-        tag["style"] = merged
-
-
-def stamp_extracted_tokens(card_body, extracted_recs_styles):
-    """
-    Walk the LLM output and stamp the customer's extracted style values as inline
-    styles onto mapped elements. Mapping:
-        card        -> outermost element
-        card_image  -> all <img> tags
-        card_title  -> first heading (h1-h6) or first <b>/<strong>
-        card_link   -> all <a> tags
-        card_text   -> all <p> tags
-
-    Also stamps the card-iteration fallback geometry (min-width / flex) on the
-    outermost element so cards size correctly even when the customer's container
-    CSS isn't present in the iframe.
-    """
-    if not card_body:
-        return card_body
-    if not extracted_recs_styles:
-        extracted_recs_styles = {}
-
-    try:
-        soup = BeautifulSoup(card_body, "html.parser")
-    except Exception:
-        return card_body
-
-    root = soup.find(True)
-    if not root:
-        return card_body
-
-    card_decl = _bucket_to_decl_string(extracted_recs_styles.get("card"), "card")
-    _set_inline_style(root, card_decl)
-    _set_inline_style(root, _CARD_NODE_FALLBACK)
-
-    title_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_title"), "card_title")
-    if title_decl:
-        title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6"]) or soup.find(["b", "strong"])
-        if title_tag:
-            _set_inline_style(title_tag, title_decl)
-
-    text_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_text"), "card_text")
-    if text_decl:
-        for p in soup.find_all("p"):
-            _set_inline_style(p, text_decl)
-
-    image_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_image"), "card_image")
-    if image_decl:
-        for img in soup.find_all("img"):
-            _set_inline_style(img, image_decl)
-
-    link_decl = _bucket_to_decl_string(extracted_recs_styles.get("card_link"), "card_link")
-    if link_decl:
-        for a in soup.find_all("a"):
-            _set_inline_style(a, link_decl)
-
-    return str(soup)
-
-
-_POSITIONING_PROPS = {"position", "left", "top", "right", "bottom", "transform", "z-index"}
-
-
-def _strip_positioning_styles(style_str):
-    """Remove JS-positioning artifacts (e.g. carousel `left: 0px`) from an inline style string."""
-    if not style_str:
-        return ""
-    kept = []
-    for decl in style_str.split(";"):
-        decl = decl.strip()
-        if not decl or ":" not in decl:
-            continue
-        prop, _ = decl.split(":", 1)
-        if prop.strip().lower() in _POSITIONING_PROPS:
-            continue
-        kept.append(decl)
-    return "; ".join(kept)
-
-
-def reattach_outer_wrapper(card_body, original_card_html):
-    """
-    Ensure the LLM-generated card body is wrapped in the customer's outermost
-    element (tag + classes + inline style + id). The LLM frequently drops this
-    wrapper, which strips the customer's card frame (background, border, shadow).
-    No-op when the LLM has already preserved the wrapper (same tag, classes
-    subset matches).
-    """
-    if not card_body or not original_card_html:
-        return card_body
-
-    try:
-        orig_root = BeautifulSoup(original_card_html, "html.parser").find(True)
-    except Exception:
-        return card_body
-    if not orig_root:
-        return card_body
-
-    try:
-        body_root = BeautifulSoup(card_body, "html.parser").find(True)
-    except Exception:
-        body_root = None
-
-    orig_classes = set(orig_root.get("class", []) or [])
-    if body_root and body_root.name == orig_root.name:
-        body_classes = set(body_root.get("class", []) or [])
-        if not orig_classes or orig_classes.issubset(body_classes):
-            return card_body
-
-    attrs = []
-    classes = orig_root.get("class")
-    if classes:
-        attrs.append(f'class="{" ".join(classes)}"')
-    style = _strip_positioning_styles(orig_root.get("style"))
-    if style:
-        attrs.append(f'style="{style}"')
-    elem_id = orig_root.get("id")
-    if elem_id:
-        attrs.append(f'id="{elem_id}"')
-
-    attrs_str = (" " + " ".join(attrs)) if attrs else ""
-    return f"<{orig_root.name}{attrs_str}>\n{card_body}\n</{orig_root.name}>"
 
 
 def sanitize_recs_output(html):

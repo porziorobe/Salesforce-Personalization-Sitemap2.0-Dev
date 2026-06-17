@@ -6,9 +6,7 @@ from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 
 class ConnectAPILLM(LLM):
     authenticator: Any
-    provider: str = "OpenAI"
-    model: str = "sfdc_ai__DefaultOpenAIGPT4OmniMini"
-    temperature: float = 0.5
+    model: str = "sfdc_ai__DefaultBedrockAnthropicClaude46Sonnet"
 
     class Config:
         arbitrary_types_allowed = True
@@ -27,10 +25,10 @@ class ConnectAPILLM(LLM):
         if not self.authenticator.authenticated:
             self.authenticator.authenticate()
 
-        url = f"https://api.salesforce.com/einstein/platform/v1/models/{self.model}/generations"
+        url = f"https://api.salesforce.com/einstein/platform/v1/models/{self.model}/chat-generations"
 
         payload = {
-            "prompt": prompt,
+            "messages": [{"role": "user", "content": prompt}],
         }
 
         headers = {
@@ -53,25 +51,8 @@ class ConnectAPILLM(LLM):
             )
 
         data = response.json()
-
-        if "generation" in data:
-            gen = data["generation"]
-            if isinstance(gen, dict):
-                return gen.get("generatedText", gen.get("text", ""))
-            return str(gen)
-
-        if "generations" in data and len(data["generations"]) > 0:
-            first = data["generations"][0]
-            if isinstance(first, dict):
-                return first.get("generatedText", first.get("content", first.get("text", "")))
-            return str(first)
-
-        return str(data)
+        return data["generationDetails"]["generations"][0]["content"]
 
     @property
     def _identifying_params(self) -> Mapping[str, Any]:
-        return {
-            "provider": self.provider,
-            "model": self.model,
-            "temperature": self.temperature,
-        }
+        return {"model": self.model}
