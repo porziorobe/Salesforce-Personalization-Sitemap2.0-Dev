@@ -830,13 +830,12 @@ def sanitize_card_html(raw_html):
         comment.extract()
 
     _strip_carousel_chrome(soup)
-    _unwrap_carousel_tracks(soup)
 
     for tag in list(soup.find_all(True)):
         if not tag.parent:
             continue
         classes = " ".join(tag.get("class", []))
-        if "modal" in classes.lower() or tag.get("aria-hidden") == "true":
+        if "modal" in classes.lower():
             tag.decompose()
             continue
         for attr in list(tag.attrs):
