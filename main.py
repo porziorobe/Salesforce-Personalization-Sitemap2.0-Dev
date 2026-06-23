@@ -344,16 +344,19 @@ Rules:
 5. IMAGE IS MANDATORY - preserve the customer's image element and wrapper chain.
    If CARD_HTML has an <img>, keep that <img> tag's class names and ALL of its
    parent wrappers (e.g. <picture>, <figure>, anchor wrappers, container divs)
-   exactly as they appear in CARD_HTML. Only change the <img>'s src and alt and
-   wrap it in an if/else for fallback. Example - if CARD_HTML has:
+   exactly as they appear in CARD_HTML. Set src="{{{{subVar 'image'}}}}" and
+   alt="{{{{subVar 'name'}}}}". No conditionals, no {{{{#if}}}}, no fallback
+   patterns — the image field is always populated.
+
+   Example - if CARD_HTML has:
        <picture class="x-pic"><a class="x-link"><img class="x-img" src="..." alt="..."></a></picture>
    Output:
-       <picture class="x-pic"><a class="x-link" href="{{{{subVar 'linkUrl'}}}}">{{{{#if (subVar 'image')}}}}<img class="x-img" src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img class="x-img" src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}</a></picture>
+       <picture class="x-pic"><a class="x-link" href="{{{{subVar 'linkUrl'}}}}"><img class="x-img" src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}"></a></picture>
 
    Do NOT add inline width/display styles to the <img>. Do NOT drop wrapper elements like <picture>.
 
-   If CARD_HTML has no <img> at all, insert this minimal pattern at the top of the card body:
-   {{{{#if (subVar 'image')}}}}<img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">{{{{else}}}}<img src="https://placehold.co/750x422/eeeeee/aaaaaa?text=No+Image" alt="">{{{{/if}}}}
+   If CARD_HTML has no <img> at all, insert at the top of the card body:
+   <img src="{{{{subVar 'image'}}}}" alt="{{{{subVar 'name'}}}}">
 
 6. PRESERVE THE CARD'S CTA ELEMENT.
    Keep the card's primary CTA link or button. Rewrite its href to {{{{subVar 'linkUrl'}}}},
@@ -385,9 +388,10 @@ Rules:
 {extracted_styles}
 
 === OUTPUT ===
-Output ONLY the complete Handlebars template (container + loop + per-card body).
+Return a single HTML block. Nothing before it, nothing after it.
+No explanations, no reasoning, no alternatives, no self-corrections.
 Exactly 3 subVar variables: image, name, linkUrl. No <style> block, no JavaScript,
-no boilerplate, no markdown fences, no commentary."""
+no markdown fences."""
 
 
 RECS_ISSUE_INSTRUCTIONS = {
