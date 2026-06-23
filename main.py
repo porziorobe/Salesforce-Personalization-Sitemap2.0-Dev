@@ -329,7 +329,8 @@ Rules:
    directly inside the container element. No extra wrapper divs around the loop.
 
 3. CARD BODY: adapt CARD_HTML into the per-card Handlebars body.
-   Keep the tag hierarchy, nesting, wrapper divs, and CSS class names from CARD_HTML.
+   Keep the tag hierarchy, nesting, wrapper divs, CSS class names, and HTML
+   attributes (width, height, aria-*, decoding, loading, etc.) from CARD_HTML.
    Do NOT flatten the hierarchy. Do NOT invent generic class names.
 
 4. SLOT EXACTLY 3 subVar VARIABLES - NO OTHERS, NO EXCEPTIONS:
